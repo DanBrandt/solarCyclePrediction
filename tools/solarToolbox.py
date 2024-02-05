@@ -32,7 +32,10 @@ def readSILSO(filename, daily=False):
         i = 0
         for line in contents:
             parsed = line.split()
-            timeVal = datetime(int(parsed[0]), int(parsed[1]), 12) # Put all observations at noon of each day
+            if daily == True:
+                timeVal = datetime(int(parsed[0]), int(parsed[1]), int(parsed[2]), 12) # Put all observations at noon of each day
+            else:
+                timeVal = datetime(int(parsed[0]), int(parsed[1]), 12) # Put all observations at noon of each day
             times.append(timeVal)
             if parsed[3] == -1:
                 spots[i] = np.nan
@@ -44,27 +47,6 @@ def readSILSO(filename, daily=False):
             i += 1
     return times, spots
 
-# ----------------------------------------------------------------------------------------------------------------------
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Execution
-if __name__ == '__main__':
-    dailyTimes, dailySpots = readSILSO('../data/SN_d_tot_V2.0.txt', daily=True)
-    monthlyTimes, monthlySpots = readSILSO('../data/SN_m_tot_V2.0.txt')
-    smoothedTimes, smoothedSpots = readSILSO('../data/SN_ms_tot_V2.0.txt')
-
-    # TODO: Add and test functions for cleaning data (if needed)
-
-    # TODO: Add and execute functions for extracting solar cycle parameters (including those computed BETWEEN cycles)
-
-    # TODO: Model the behavior of the solar cycle parameters (see how they vary with other things)
-
-    # TODO: Extrapolate them to future cycles (compare with simple parametric modeling).
-
-    # TODO: Use Dynamic Time Warping to assess how well the predictions worked (except those for SC25's latter half,
-    # SC26, and SC27)
-
-    sys.exit(0)
 # ----------------------------------------------------------------------------------------------------------------------
 
 
