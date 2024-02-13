@@ -105,8 +105,51 @@ if __name__ == '__main__':
     for j in range(len(cycleTroughs)):
         plt.axvline(x=smoothedTimes[cycleTroughs[j]], color='r')
 
-    # TODO: 3: MODEL THE BEHAVIOR OF SOLAR CYCLE PARAMETERS
+    # Extract each solar cycle for the purpose of Superposed Epoch Analysis and Dynamic Time Warping:
+    boundaries = [solarToolbox.find_nearest(np.asarray(clippedMonthlyTimes), element)[0] for element in np.asarray(smoothedTimes)[cycleTroughs]]
+    superposedMonthlySSN = solarToolbox.superpose(clippedMonthlySpots, boundaries)
+    superposedSmoothedSSN = solarToolbox.superpose(clippedSmoothedSpots, boundaries)
+    plt.figure()
+    for element in superposedMonthlySSN:
+        plt.plot(element)
+    plt.figure()
+    for element in superposedSmoothedSSN:
+        plt.plot(element)
 
+    # Perform standard Superposed Epoch Analysis, using the mean cycle duration as the normalized epoch timeline:
+    normalizedSuperposedMonthlySSN = solarToolbox.SEA(superposedMonthlySSN)
+    meanNSM_SSN = np.mean(normalizedSuperposedMonthlySSN, axis=0)
+    plt.figure()
+    plt.plot(normalizedSuperposedMonthlySSN.T)
+    plt.plot(meanNSM_SSN, color='k', linewidth=5)
+
+    normalizedSuperposedSmoothedSSN = solarToolbox.SEA(superposedSmoothedSSN)
+    meanNSS_SSN = np.mean(normalizedSuperposedSmoothedSSN, axis=0)
+    plt.figure()
+    plt.plot(normalizedSuperposedSmoothedSSN.T)
+    plt.plot(meanNSS_SSN, color='k', linewidth=5)
+
+    # Perform the Dynamic Time Warping:
+    # TODO: DO the below for each succesive cycle...
+
+    ## Find the best match with the canonical recursion formula
+    from dtw import *
+    query = normalizedSuperposedMonthlySSN[0, :]
+    template = normalizedSuperposedMonthlySSN[1, :]
+    alignment = dtw(query, template, keep_internals=True)
+    ## Display the warping curve, i.e. the alignment curve
+    alignment.plot(type="threeway")
+    ## Align and plot with the Rabiner-Juang type VI-c unsmoothed recursion
+    dtw(query, template, keep_internals=True,
+    step_pattern=rabinerJuangStepPattern(6, "c"))\
+    .plot(type="twoway",offset=-2)
+    ## See the recursion relation, as formula and diagram
+    print(rabinerJuangStepPattern(6,"c"))
+    rabinerJuangStepPattern(6,"c").plot()
+
+
+
+    # TODO: 3: MODEL THE BEHAVIOR OF SOLAR CYCLE PARAMETERS (start by relating various parameters to others)
 
     # TODO: Extrapolate them to future cycles (compare with simple parametric modeling).
 
