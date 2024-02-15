@@ -63,21 +63,21 @@ def find_nearest(array, value):
     return idx, array[idx]
 
 def superpose(data, boundaries):
-        """
-        Given a stream of data and boundaries in that data, extract the individual phenomena and superpose them.
-        :param data: arraylike
-            A 1d array or list.
-        :param boundaries: arraylike
-            A 1d array or list of boundaries for each phenomenon to be superposed. Each value in this argument should be
-            an index.
-        :return superposedData:
-            The individual superposed phenomena.
-        """
-        superposedData = []
-        # Collect the phenomena:
-        for i in range(len(boundaries)-1):
-            superposedData.append(data[boundaries[i]:boundaries[i+1]])
-        return superposedData
+    """
+    Given a stream of data and boundaries in that data, extract the individual phenomena and superpose them.
+    :param data: arraylike
+        A 1d array or list.
+    :param boundaries: arraylike
+        A 1d array or list of boundaries for each phenomenon to be superposed. Each value in this argument should be
+        an index.
+    :return superposedData:
+        The individual superposed phenomena.
+    """
+    superposedData = []
+    # Collect the phenomena:
+    for i in range(len(boundaries)-1):
+        superposedData.append(data[boundaries[i]:boundaries[i+1]])
+    return superposedData
 
 def SEA(superposedPhenomena):
     """
@@ -98,6 +98,144 @@ def SEA(superposedPhenomena):
         normalizedSuperposedPhenomena.append(currentNormalizedPhenomena)
     normalizedSuperposedPhenomena = np.asarray(normalizedSuperposedPhenomena)
     return normalizedSuperposedPhenomena
+
+def eFold(data):
+    """
+    Return the index of the e-folding time of the data. Assumes that the e-folding time is calculated after the
+    maximum of the data.
+    :param data: arraylike
+        A 1D array of data.
+    :return eFoldingTime: float
+        The e-folding time in units of indices.
+    :return eFoldingIndex: int
+        The actual index of where the e-folding time occurs
+    :return eFoldingValue: float
+        The value of the data at the e-folding time.
+    """
+    maxLoc = np.argmax(data)
+    dataSubset = np.asarray(data)[maxLoc:]
+    eFoldingActualValue = np.asarray(data)[maxLoc] / np.e
+    eFoldingIndex, eFoldingValue = find_nearest(dataSubset, eFoldingActualValue)
+    eFoldingTime = eFoldingIndex + maxLoc
+    return eFoldingTime, eFoldingIndex, eFoldingValue
+
+def customSEA(superposedPhenomena):
+    """
+    Given an output from 'superpose', perform normalization to warp the phenomena to the normalized timeline taken
+    as constructed from the following epoch markers: mean peak-location, mean e-folding time, and mean cycle
+    duration.
+    :param superposedPhenomena: list
+        Output from superpose.
+    :return normalizedSuperposedPhenomena: ndarray
+        The superposed phenomena conformed to the normalized timeline.
+    """
+    # Obtain peak locations:
+    maxLocs = []
+    for element in superposedPhenomena:
+        maxLocs.append(np.argmax(element))
+    meanMaxLoc = int(np.round(np.mean(maxLocs)))
+    # Obtain peak e-folding times (locations):
+    eFoldingTimes = []
+    eFoldingIndices = []
+    for element in superposedPhenomena:
+        result = eFold(element)
+        eFoldingTimes.append(result[0])
+        eFoldingIndices.append(result[1])
+    meanEFoldTime = int(np.round(np.mean(eFoldingTimes)))
+    meanEFoldIndex = int(np.round(np.mean(eFoldingIndices)))
+    # Obtain mean cycle duration:
+    decayTimes = []
+    i = 0
+    for element in superposedPhenomena:
+        decayTimes.append( len(element) - eFoldingTimes[i] )
+        i += 1
+    meanEpochDuration = int(np.floor(np.mean([len(element) for element in superposedPhenomena])))
+    meanDecayTime = int(np.round(np.mean(decayTimes)))
+
+    # Sanity check:
+    # import matplotlib.pyplot as plt
+    # import matplotlib
+    # matplotlib.use('Qt5Agg')
+    # plt.figure()
+    # plt.plot(superposedPhenomena[0])
+    # plt.axvline(x=eFoldingTimes[0])
+
+    # Construct the normalize epoch timeline from the epoch markers, piece-by-piece:
+    start_to_max = np.linspace(0, meanMaxLoc-1, meanMaxLoc)
+    max_to_e_fold = np.linspace(meanMaxLoc, meanEFoldTime-1, meanEFoldIndex)
+    e_fold_to_end = np.linspace(meanEFoldTime, meanEpochDuration-1, meanDecayTime)
+
+    # Helper function for resampling along each section of the normalized epoch:
+    def impose(original_data, new_duration, new_axis):
+        xSample = np.linspace(new_axis[0], new_axis[-1], len(original_data))
+        spline = InterpolatedUnivariateSpline(xSample, original_data)
+        xSampleNew = np.linspace(new_axis[0], new_axis[-1], new_duration)
+        return spline(xSampleNew)
+
+    # Superpose all of the phenomena onto the normalized timeline, stitching each section together:
+    normalizedSuperposedPhenomena = []
+    j = 0
+    for element in superposedPhenomena:
+        original_start_to_max = element[:np.argmax(element)]
+        normed_start_to_max = impose(original_start_to_max, len(start_to_max), start_to_max)
+        original_max_to_e_fold = element[np.argmax(element):eFoldingTimes[j]]
+        normed_max_to_e_fold = impose(original_max_to_e_fold, len(max_to_e_fold), max_to_e_fold)
+        original_e_fold_to_end = element[eFoldingTimes[j]:]
+        normed_e_fold_to_end = impose(original_e_fold_to_end, len(e_fold_to_end), e_fold_to_end)
+        currentNormalizedPhenomena = np.concatenate((normed_start_to_max, normed_max_to_e_fold, normed_e_fold_to_end))
+        normalizedSuperposedPhenomena.append(currentNormalizedPhenomena)
+        j += 1
+
+    normalizedSuperposedPhenomena = np.asarray(normalizedSuperposedPhenomena)
+    return normalizedSuperposedPhenomena
+
+def linear(x, a, b):
+    """
+    Sample linear function.
+    :param x: arraylike
+        1D data.
+    :param a: float
+        Coefficient (slope).
+    :param b: float
+        Coefficient (intercept).
+    :return y: float or arraylike
+        Dependent variable.
+    """
+    return a*x + b
+
+def quadratic(x, a, b, c):
+    """
+    Sample quadratic function.
+    :param x: arraylike
+        1D data.
+    :param a: float
+        First coefficient.
+    :param b: float
+        Second coefficient.
+    :param c: float
+        Third coefficient.
+    :return y: float or arraylike
+        Dependent variable.
+    """
+    return a*x**2 + b*x + c
+
+def sinusoid(x, a, b, c, d):
+    """
+    Sample sinuisoidal function.
+    :param x: arraylike
+        1D data.
+    :param a: float
+        First coefficient.
+    :param b: float
+        Second coefficient.
+    :param c: float
+        Third coefficient.
+    :param d: float
+        Fourth coefficient.
+    :return y: float or arraylike
+        Dependent variable.
+    """
+    return a*np.sin(b*x + c) + d
 # ----------------------------------------------------------------------------------------------------------------------
 
 
