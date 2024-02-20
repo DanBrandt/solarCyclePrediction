@@ -4,9 +4,12 @@
 # Top-level imports:
 import numpy as np
 from datetime import datetime
+import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Qt5Agg')
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.optimize import curve_fit
+from sklearn.metrics import r2_score
 # ----------------------------------------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -236,6 +239,44 @@ def sinusoid(x, a, b, c, d):
         Dependent variable.
     """
     return a*np.sin(b*x + c) + d
+
+def plotData(data1, data2, figname, figStrings):
+    """
+    Given two 1D data streams, plot them against each other, along with fitted curves with their associated R^2
+    values.
+    :param data1: arraylike
+        1D data - the independent variable.
+    :param data2: arraylike
+        1D data - the dependent variable.
+    :param figname: str
+        The name/location where the file will be saved.
+    :param figStrings: list
+        A list with three elements that are strings: The first two are x- and y-axis labels, respectively, and the
+        last is the title.
+    :return: nothing
+    """
+    data1 = np.asarray(data1)
+    data2 = np.asarray(data2)
+    # Curve-fitting:
+    sortInds = np.argsort(data1)
+    popt, pcov = curve_fit(linear, data1[sortInds], data2[sortInds])
+    pred = linear(data1[sortInds], *popt)
+    r2_linear = r2_score(data2, pred)
+    popt2, pcov2 = curve_fit(quadratic, data1[sortInds], data2[sortInds])
+    pred2 = quadratic(data1[sortInds], *popt2)
+    r2_quadratic = r2_score(data2, pred2)
+    # Plotting:
+    plt.figure(figsize=(16, 7))
+    plt.scatter(data1, data2)
+    plt.plot(data1[sortInds], pred, color='r',
+             label=r'Linear Fit ($R^2\approx' + str(np.round(r2_linear, 2)) + '$)')
+    plt.plot(data1[sortInds], pred2, color='m',
+             label=r'Quadratic Fit ($R^2\approx' + str(np.round(r2_quadratic, 2)) + '$)')
+    plt.xlabel(figStrings[0])
+    plt.ylabel(figStrings[1])
+    plt.title(figStrings[-1])
+    plt.legend(loc='best')
+    plt.savefig(figname, dpi=300)
 # ----------------------------------------------------------------------------------------------------------------------
 
 

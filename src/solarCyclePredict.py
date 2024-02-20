@@ -139,6 +139,7 @@ if __name__ == '__main__':
     for i in range(len(cycleLengths)):
         yVals = monthlySpots[cycleTroughs[i]:cycleTroughs[i+1]]
         cycleAreas.append( trapezoid(yVals) )
+    cycleAreas = np.asarray(cycleAreas)
 
     # FIGURE: Solar Cycle Progression, with identified peaks and troughs:
     plt.figure(figsize=(18, 9))
@@ -294,17 +295,20 @@ if __name__ == '__main__':
     plt.savefig(figures_directory+'maxAmplitude_vs_duration.png', dpi=300)
 
     # TODO: 2: SC Amplitude vs. Area Under the Curve
-
+    solarToolbox.plotData(cycleAreas, monthlyPeaksVals, figname=figures_directory + 'maxAmplitude_vs_area_under_curve.png',
+                          figStrings=['Area-Under-the-Curve', 'Maximum Amplitude (SSN)',
+                                      'SC Maximum Amplitude vs. Area-Under-the-Curve (monthly-averaged)'])
 
     # TODO: 3: SC Duration vs. Area Under the Curve
-
+    solarToolbox.plotData(cycleLengths, cycleAreas, figname=figures_directory + 'area_under_curve_vs_cycleLength.png',
+                          figStrings=['Cycle Duration (years)', 'Area-Under-the-Curve',
+                                      'SC Duration vs. Area-Under-the-Curve (monthly-averaged)'])
 
     # TODO: SC Amplitude vs. e-folding Time
     cycleEFoldingTimes = np.array([solarToolbox.eFold(element)[0] for element in superposedMonthlySSN])/12. # In units of years
 
 
     # TODO: SC Duration vs. e-folding Time
-
 
     # TODO: Area Under the Curve vs. e-folding Time
 
