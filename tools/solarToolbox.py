@@ -10,6 +10,7 @@ matplotlib.use('Qt5Agg')
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
+import math
 # ----------------------------------------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -55,7 +56,7 @@ def find_nearest(array, value):
     :param: array: ndarray
         The array to search over.
     :param: value:
-        The value to compare to all of the values of the array.
+        The value to compare to all the values of the array.
     :return: idx: int
         The index of the element in array closest to value.
     :return: array[idx]: float or int
@@ -175,7 +176,7 @@ def customSEA(superposedPhenomena):
         xSampleNew = np.linspace(new_axis[0], new_axis[-1], new_duration)
         return spline(xSampleNew)
 
-    # Superpose all of the phenomena onto the normalized timeline, stitching each section together:
+    # Superpose all the phenomena onto the normalized timeline, stitching each section together:
     normalizedSuperposedPhenomena = []
     j = 0
     for element in superposedPhenomena:
@@ -277,6 +278,77 @@ def plotData(data1, data2, figname, figStrings):
     plt.title(figStrings[-1])
     plt.legend(loc='best')
     plt.savefig(figname, dpi=300)
+
+def clip(timeData, boundaries):
+    """
+    Given some list of datetimes and two dates, return only the data between those two dates, along with the indices
+    corresponding to data between those two dates.
+    :param timeData: list
+        A list of datetimes.
+    :param boundaries: list
+        A two-element list where the first element is the starting date, and the second element is the ending date. The
+        starting date must be older than the ending date.
+    :return clippedTimes: list
+        The datetimes between the boundaries.
+    :return inds: list
+        A list of indices of the time data between the boundaries.
+    """
+    inds = np.where((np.asarray(timeData) >= boundaries[0]) & (np.asarray(timeData) <= boundaries[-1]))[0]
+    clippedTimes = np.asarray(timeData)[inds]
+    return clippedTimes, inds
+
+def makeTimeAxis(data, units='years'):
+    """
+    Given some 1D time series data, make a corresponding time array with the desired base units.
+    :param data:
+    :param units:
+        A string denoting the time cadence of the axis to be returned. Valid arguments are: 'seconds', 'minutes',
+        'hours', 'days', 'months' (corresponds to 30 days), and 'years'. Default is 'years'. NOTE: YOU MUST KNOW THE
+        NATIVE TIME RESOLUTION OF THE INPUT DATA TO USE THIS CORRECTLY. THIS FUNCTION ASSUMES THAT THE NATIVE RESOLUTION
+        OF THE DATA IS MONTHLY.
+    :return timeAxis:
+        The time axis in the desired units.
+    """
+    timeAxis = np.linspace(0, len(data)-1, len(data))
+    if units == 'years':
+        factor = 12.
+    elif units == 'months':
+        factor = 1.
+    elif units == 'days':
+        factor = 1/30.
+    elif units == 'hours':
+        factor = 1/720.
+    elif units == 'minutes':
+        factor = 1/43200.
+    elif units == 'seconds':
+        factor = 1/2592000.
+    else:
+        raise ValueError("Invalid arguement ")
+    timeAxis = timeAxis/factor
+    return timeAxis
+
+def subset_data(times, vals, boundaries):
+    """
+    Given some time series data and boundaries, return a subset of that data within the boundaries (inclusive).
+    :param times: arraylike
+        A list or array of datetimes.
+    :param vals: arraylike
+        A list of array of values with the same shape as 'times'.
+    :param boundaries: list
+        A list where the first element is a datetime lower boundary, and the second element is a datetime upper
+        boundary.
+    :return subsetTime: ndarray
+        The subset time values.
+    :return subsetVals: ndarray
+        The subset data values.
+    """
+    goodInds = np.where((np.asarray(times) >= boundaries[0]) & (np.asarray(times) <= boundaries[-1]))[0]
+    subsetTime = np.asarray(times)[goodInds]
+    subsetVals = np.asarray(vals)[goodInds]
+    return subsetTime, subsetVals
+
+def orderOfMagnitude(number):
+    return math.floor(math.log(number, 10))
 # ----------------------------------------------------------------------------------------------------------------------
 
 
