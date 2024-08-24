@@ -119,15 +119,15 @@ def relate(drivers, true_data, subset_number, test_data):
     # Rigourously...
     print('Fitting GAMs...')
     time.sleep(1)
+    # TODO: Fix the fitting - the results obtained in lines 127 and 128 are close to zero, and smack of an incorrect fitting procedure!
     bestModelInfo, bestModelDrivers = modelLoop(truth=true_data, input=downselected_input_data,
-                                                                    modelType='GAM')
-    res24_final = bestModelInfo[0][0].predict(np.array([X[-1, :-1]]))
-    res25_final = bestModelInfo[0][0].predict(np.array([[]]))
+                                                                    modelType='GAM', sparse=True)
 
     # Predictions...
+    res24_final = bestModelInfo[0][0].predict([X[-1, :]])
+    res25_final = bestModelInfo[0][0].predict(np.array([[element[-1] for element in downselected_test_data]]))
 
-
-    return
+    return bestModelInfo[0][0], bestModelDrivers, bestModelInfo[1]
 
 def get_cross_terms(data):
     '''
@@ -200,7 +200,7 @@ def uniqueCombs(arraylike, exclude_singular=True):
     else:
         return myComb
 
-def modelLoop(truth, input, modelType='GLM'):
+def modelLoop(truth, input, modelType='GLM', sparse=False):
     """
     Given some input data, fit a series of models between the input data and the truth data that is the desired
     output of the model. From the input data, return the linear model that BEST models the data. Perform
@@ -215,6 +215,9 @@ def modelLoop(truth, input, modelType='GLM'):
     :param modelType: str
         A string describing the type of model to fit. Valid arguments include 'GLM' for Generalized Linear Model and
         'GAM' for Generalized Additive Model. Default is 'GLM'.
+    :param sparse: bool
+        Controls whether standard 90-10-10 K-fold cross-validation is used during model fitting. Will do so if set to
+        False. If True, simply does K-fold cross-validation with the 'leave one out approach'. Default is False.
     :return modelResults: list
         Contains details about the best model. The elements of the list are as follows:
         0: Index of the 90-10-10 split chosen as best-performing
@@ -234,7 +237,10 @@ def modelLoop(truth, input, modelType='GLM'):
         currentDrivers = []
         for j in unique_combinations[i]:
             currentDrivers.append(input[j])
-        res, coverage = fitModel(truth, currentDrivers, modelType=modelType)
+        if sparse == False:
+            res, coverage = fitModel(truth, currentDrivers, modelType=modelType)
+        else:
+            res, coverage = fitSparseModel(truth, currentDrivers, modelType=modelType)
         modelResults.append( [res, coverage] )
 
     # Select the best model:
@@ -253,12 +259,87 @@ def modelLoop(truth, input, modelType='GLM'):
 
     return modelResults[bestModelInd], best_drivers
 
+def fitSparseModel(truth, my_drivers, modelType='GAM'):
+    """
+    Fit a linear or GAM model with PyGAM, for sparse data.
+    :param truth: list
+        A two-element list where the first element is a string describing the data,
+        the second element is an arraylike of time values for the data, and the third
+        element are data values, with the same length as the arraylike of datetimes.
+    :param my_drivers: list
+        A multiple-element list where each element has the same format as 'truth', but corresponds to a different
+        input variable.
+    :param modelType: str
+        A string describing the type of model to fit. Valid arguments include 'GLM' for Generalized Linear Model and
+        'GAM' for Generalized Additive Model. Default is 'GLM'.
+    :return final_cross_val_results: list
+        Contains the model object and performance statistics for the model
+    :return coverage: list
+        A list where the first element are datetimes corresponding to the places of valid data across the entire fitting
+        interval, the second are the valid driver data, and the last are the valid true data.
+    """
+    drivers = np.array([element[-1] for element in my_drivers]).T
+    numLambdas = 100
+    lambdas = np.linspace(0, 1000000, numLambdas)
+    numTerms = len(my_drivers)
+    cross_val_results = []
+    scores = []
+    obj = 'AICc'
+    if modelType == 'GLM':
+        modStr = 'l'  # Linear terms
+        arguments = modelArgs(numTerms, model=modStr)
+    elif modelType == 'GAM':
+        modStr = 's'  # Spline terms
+        arguments = modelArgs(numTerms, model=modStr, knobs=1000)  # knobs=len(train_index)
+    else:
+        raise ValueError('Invalid value given for argument "modelType". Argument must either be "GLM" or "GAM".')
+
+    for k, lam in tqdm(enumerate(lambdas)):
+        # See line 2037 of https://github.com/dswah/pyGAM/blob/master/pygam/pygam.py
+        # TODO: A THIRD loop could be placed here, around the GAM model fit, to implement an l1 penalty to account for non-Gaussian behavior of residuals...
+        model = LinearGAM(eval(arguments), lam=lam).fit(drivers, truth[1])
+        # lams = [lam] * numTerms
+        # model.gridsearch(drivers_subset_data_only[train_index, :], truth_subset_data_only[train_index], lam=lams)
+        # Pick an objective obj to optimize via cross-validation
+        # E.g., ['GCV', 'UBRE', 'AIC', 'AICc']
+        # AICc is preferred (use internal method to calculate it)
+        # score = model.statistics_[obj]
+        # scores[j, k] = score
+        preds = model.predict(drivers)
+        actual = truth[1]
+        my_aicc = model._estimate_AICc(mu=preds, y=actual)
+        scores.append(my_aicc) # mean_squared_error(actual, preds) # my_aicc
+        modelStats = errorStats(preds, actual, printResults=False)
+        modelPerformance = [*modelStats, mean_squared_error(actual, preds)]
+        cross_val_results.append([model, modelPerformance, my_aicc])
+
+    # Perform one more fit, but using ALL the data, but with the value of lambda corresponding to the best model:
+    mean_scores = np.mean(scores, axis=0) # We take the mean across the folds in order to maximize generalizability.
+    best_single_score_ind = np.argmin(mean_scores)
+    best_lambda = lambdas[best_single_score_ind]
+    final_model = LinearGAM(eval(arguments), lam=best_lambda).fit(drivers, truth[1])
+
+    # Evaluate the performance of this model across the entire dataset:
+    finalPreds = final_model.predict(drivers)
+    final_modelStats = errorStats(finalPreds, truth[1])
+    final_model_performance = [*final_modelStats, mean_squared_error(truth[1], finalPreds)]
+    final_cross_val_results = [final_model, final_model_performance, final_model.statistics_[obj]]
+
+    # # Select the best-performing model (according to MEAN SQUARED ERROR):
+    # modelStats = [element[-1] for element in cross_val_results]
+    # MSE_vals = [element[-1] for element in modelStats]
+    # bestModelInd = np.argmin(MSE_vals)
+
+    coverage = [truth[1], drivers, truth[2], finalPreds]
+
+    return
+
 def fitModel(truth, drivers, modelType='GLM'):
     """
     Fit a linear or GAM model with PyGAM, given some input data and truth data to fit to.
     :param truth: list
         A two-element list where the first element is a string describing the data,
-        the second element is an arraylike of datetime values for the data, and the second
+        the second element is an arraylike of datetime values for the data, and the third
         element are data values, with the same length as the arraylike of datetimes.
     :param drivers: list
         A multiple-element list where each element has the same format as 'truth', but corresponds to a different
@@ -315,7 +396,7 @@ def fitModel(truth, drivers, modelType='GLM'):
     obj = 'AICc'
     numLambdas = 20
     # lambdas = np.arange(0, 105000, 5000) # np.linspace(0, 1, num=11, endpoint=True) # Consider a MUCH wider search space, i.e.: np.arange(0, 105000, 5000)
-    lambdas = np.linspace(0, 10_000, numLambdas)
+    lambdas = np.linspace(0, 1000000, numLambdas)
     scores = np.zeros((10, lambdas.shape[0]), dtype=float)
     for j, (train_index, test_index) in enumerate(kf.split(drivers_subset_data_only)):
         # print(f"Fold {j+1}:")
