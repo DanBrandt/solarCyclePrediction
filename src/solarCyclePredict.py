@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Qt5Agg')
 import sys
+from datetime import datetime, timedelta
 
 # Local imports:
 from tools import solarToolbox
@@ -242,5 +243,23 @@ if __name__ == '__main__':
     # 7 - Validation: Running this method for PAST cycles:
 
     # 8 - Forecasting results:
+    plt.figure(figsize=(18, 9))
+    plt.plot(smoothedTimes[clippedCycleTroughs[-2]:][:-6], smoothedSpots[clippedCycleTroughs[-2]:][:-6], label=r'13-Month Smoothed $S_{\mathrm{N}}$')
+    plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='k')
+    plt.axvline(x=smoothedTimes[cycleTroughs[-2]], color='r')
+    plt.axvline(x=smoothedTimes[cycleTroughs[-1]], color='r')
+    # Forecasts:
+    xerr_24 = timedelta(days=183.691699295)
+    plt.errorbar(smoothedTimes[cycleTroughs[-2]]+timedelta(days=1945.3231866650622), 119.33312958127479, xerr=xerr_24,
+                 yerr=21.4728627313, capsize=5, color='tab:orange', label='SC24 Hindcast')
+    xerr_25 = timedelta(days=144.445330626)
+    plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=1669.8092850056678), 137.83096839804202, xerr=xerr_25,
+                 yerr=17.414084048, capsize=5, color='tab:green', label='SC25 Forecast')
+    # Axes/labels/saving:
+    plt.xlabel('Date')
+    plt.ylabel('$S_{\mathrm{N}}$')
+    plt.title('Solar Cycle Hindcast and Forecast', fontsize=18)
+    plt.legend(loc='best', framealpha=1)
+    plt.savefig(figures_directory + 'solarCycleHindcastForecast.png', dpi=300)
 
     sys.exit(0)
