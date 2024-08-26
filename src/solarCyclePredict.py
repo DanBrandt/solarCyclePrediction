@@ -232,10 +232,10 @@ if __name__ == '__main__':
     print(sc_drivers_for_forecasting)
 
     # 5 - Results of FOCI:
-    true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
-    bestModel_amplitude, bestDrivers_amplitude, stats_amplitude = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting)
-    true_data_max_amplitude_time = ['nextMaxAmplitudeTime', cycleNum[1:], cycleAscendingTimes[1:]]
-    bestModel_amplitude_time, bestDrivers_amplitude_time, stats_amplitude_time = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting)
+    # true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
+    # bestModel_amplitude, bestDrivers_amplitude  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting)
+    true_data_max_amplitude_time = ['nextMaxAmplitudeTime', cycleNum[1:], np.asarray(cycleAscendingTimes[1:])]
+    bestModel_amplitude_time, bestDrivers_amplitude_time = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting)
 
     # 6 - Correlation plot between FOCI results and Solar Cycle Max Amplitude & and Solar Cycle Time and Max Amplitude:
 

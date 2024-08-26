@@ -115,19 +115,54 @@ def relate(drivers, true_data, subset_number, test_data):
     gam = LinearGAM(s(0) + s(1) + s(2)).fit(X, y)
     res24 = gam.predict(np.array([X[-1, :]])) # Naive SC24 'prediction'
     res25 = gam.predict(np.array([[element[-1] for element in downselected_test_data]])) # Naive SC25 prediction (amplitude)
-    
-    # Rigourously...
-    print('Fitting GAMs...')
-    time.sleep(1)
-    # TODO: Fix the fitting - the results obtained in lines 127 and 128 are close to zero, and smack of an incorrect fitting procedure!
-    bestModelInfo, bestModelDrivers = modelLoop(truth=true_data, input=downselected_input_data,
-                                                                    modelType='GAM', sparse=True)
+
+    # Rigorously:
+    print('Tuning the smoothing parameter...')
+    numLambdas = 1000
+    lambdas = np.linspace(0.014432,0.014434, numLambdas) # Time # np.linspace(0.01328, 0.01329, numLambdas) # Amplitude
+    numTerms = X.shape[1]
+    numKnobs = X.shape[0] * 2
+    arguments = modelArgs(numTerms, model='s', knobs=numKnobs)
+    models = []
+    model_error = []
+    aicc_vals = []
+    for lam in tqdm(lambdas):
+        gam = LinearGAM(eval(arguments), lam=lam).fit(X, y)
+        models.append(gam)
+        res = gam.predict(X)
+        mse = mean_squared_error(true_data[-1], res)
+        model_error.append(mse)
+        my_aicc = gam._estimate_AICc(mu=res, y=true_data[-1])
+        aicc_vals.append(my_aicc)
+    best_model_ind = np.argmin(aicc_vals)
+    myGam = models[best_model_ind]
+    print('Best model found; best lambda = '+str(lambdas[best_model_ind]))
+    # View the model results:
+    # plt.figure()
+    # plt.plot(lambdas, aicc_vals)
+    # plt.xlabel('Lambda')
+    # plt.ylabel('AICc')
+
+    # # More Rigourously...
+    # print('Fitting GAMs...')
+    # time.sleep(1)
+    # # TODO: Fix the fitting - the results obtained in lines 127 and 128 are close to zero, and smack of an incorrect fitting procedure!
+    # bestModelInfo, bestModelDrivers = modelLoop(truth=true_data, input=downselected_input_data,
+    #                                                                 modelType='GAM', sparse=True)
 
     # Predictions...
-    res24_final = bestModelInfo[0][0].predict([X[-1, :]])
-    res25_final = bestModelInfo[0][0].predict(np.array([[element[-1] for element in downselected_test_data]]))
+    res24_final = myGam.predict([X[-1, :]])
+    res25_final = myGam.predict(np.array([[element[-1] for element in downselected_test_data]]))
 
-    return bestModelInfo[0][0], bestModelDrivers, bestModelInfo[1]
+    # Uncertainty...
+    res24_CI = myGam.prediction_intervals([X[-1, :]], width=0.68)
+    res25_CI = myGam.prediction_intervals(np.array([[element[-1] for element in downselected_test_data]]), width=0.68)
+
+    # Print results:
+    print('SC24 hindcast: '+str(res24_final[0])+' 68% CI: '+str(res24_CI[0]))
+    print('SC25 forecast: ' + str(res25_final[0]) + ' 68% CI: ' + str(res25_CI[0]))
+
+    return myGam, downselected_input_data
 
 def get_cross_terms(data):
     '''
@@ -207,8 +242,8 @@ def modelLoop(truth, input, modelType='GLM', sparse=False):
     cross-validation for model selection using the 90-10-10 rule.
     :param truth: list
         A two-element list where the first element is a string describing the data,
-        the second element is an arraylike of datetime values for the data, and the second
-        element are data values, with the same length as the arraylike of datetimes.
+        the second element is an array-like of datetime values for the data, and the second
+        element are data values, with the same length as the array-like of time values.
     :param input: list
         A multiple-element list where each element has the same format as 'truth', but corresponds to a different
         input variable.
@@ -332,7 +367,7 @@ def fitSparseModel(truth, my_drivers, modelType='GAM'):
 
     coverage = [truth[1], drivers, truth[2], finalPreds]
 
-    return
+    return final_cross_val_results, coverage
 
 def fitModel(truth, drivers, modelType='GLM'):
     """
