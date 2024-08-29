@@ -27,7 +27,7 @@ matplotlib.use('Qt5Agg')
 from tools import solarToolbox
 
 # Functions:
-def relate(drivers, true_data, subset_number, test_data):
+def relate(drivers, true_data, subset_number, test_data, lambda_range=None):
     '''
     This is the master routine for implementing FOCI. It does the following:
         1. Takes in an array where each column is a predictor variable and computes all possible cross-terms from those
@@ -51,6 +51,9 @@ def relate(drivers, true_data, subset_number, test_data):
         it will be run again with all possible cross-terms of the initial subset.
     :param test_data: list or arraylike
         Data to feed to the final model for prediction.
+    :param lambda_range: list
+        A list with two elements that specifies the range of lambda values to loop over when performing regularization
+        on the GAMs. Default is None, in which case the range will be [0, 1e6].
     :return best_drivers:
         The best model drivers.
     :return best_gam:
@@ -119,7 +122,10 @@ def relate(drivers, true_data, subset_number, test_data):
     # Rigorously:
     print('Tuning the smoothing parameter...')
     numLambdas = 1000
-    lambdas = np.linspace(0.014432,0.014434, numLambdas) # Time # np.linspace(0.01328, 0.01329, numLambdas) # Amplitude
+    if lambda_range is None:
+        lambdas = np.linspace(0, 1e6, numLambdas)
+    else:
+        lambdas = np.linspace(lambda_range[0], lambda_range[-1], numLambdas) # np.linspace(0.014432,0.014434, numLambdas) # Time # np.linspace(0.01328, 0.01329, numLambdas) # Amplitude
     numTerms = X.shape[1]
     numKnobs = X.shape[0] * 2
     arguments = modelArgs(numTerms, model='s', knobs=numKnobs)
@@ -162,7 +168,7 @@ def relate(drivers, true_data, subset_number, test_data):
     print('SC24 hindcast: '+str(res24_final[0])+' 68% CI: '+str(res24_CI[0]))
     print('SC25 forecast: ' + str(res25_final[0]) + ' 68% CI: ' + str(res25_CI[0]))
 
-    return myGam, downselected_input_data
+    return myGam, downselected_input_data, [res24_final[0], res25_final[0]], [res24_CI[0], res25_CI[0]]
 
 def get_cross_terms(data):
     '''
