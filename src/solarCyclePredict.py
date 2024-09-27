@@ -234,8 +234,8 @@ if __name__ == '__main__':
 
     # 5 - Results of FOCI:
     # TODO: Cache the outputs of this step.
-    # true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
-    # bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
+    true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
+    bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
 
     # TODO: Fix the fact that we cannot run FOCI immediately a second time.
 
