@@ -7,7 +7,7 @@ from scipy.integrate import trapezoid
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Qt5Agg')
-import sys
+import sys, os
 from datetime import datetime, timedelta
 
 # Local imports:
@@ -233,16 +233,73 @@ if __name__ == '__main__':
     print(sc_drivers_for_forecasting)
 
     # 5 - Results of FOCI:
-    # TODO: Cache the outputs of this step.
+    amplitude_cache_file = '../results/amplitude_cache.pkl'
     true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
-    bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
+    if os.path.isfile(amplitude_cache_file) == False:
+        bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
+        cachedAmplitudeResults = {
+            'bestModel_amplitude': bestModel_amplitude,
+            'bestDrivers_amplitude': bestDrivers_amplitude,
+            'preds_amplitude': preds_amplitude,
+            'preds_amplitudeCI': preds_amplitudeCI
+        }
+        solarToolbox.savePickle(cachedAmplitudeResults, amplitude_cache_file)
+    else:
+        cachedAmplitudeResults = solarToolbox.loadPickle(amplitude_cache_file)
+        bestModel_amplitude = cachedAmplitudeResults['bestModel_amplitude']
+        bestDrivers_amplitude = cachedAmplitudeResults['bestDrivers_amplitude']
+        preds_amplitude = cachedAmplitudeResults['preds_amplitude']
+        preds_amplitudeCI = cachedAmplitudeResults['preds_amplitudeCI']
 
-    # TODO: Fix the fact that we cannot run FOCI immediately a second time.
-
+    # TODO: Fix the fact that we cannot run FOCI immediately a second time (when results from the above ARE NOT cached).
+    amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
     true_data_max_amplitude_time = ['nextMaxAmplitudeTime', cycleNum[1:], np.asarray(cycleAscendingTimes[1:])]
-    bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.014432,0.014434])
+    if os.path.isfile(amplitude_time_cache_file) == False:
+        bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.014432,0.014434])
+        cachedAmplitudeTimeResults = {
+            'bestModel_amplitude_time': bestModel_amplitude_time,
+            'bestDrivers_amplitude_time': bestDrivers_amplitude_time,
+            'preds_amplitude_time': preds_amplitude_time,
+            'preds_amplitude_time_CI': preds_amplitude_time_CI
+        }
+        solarToolbox.savePickle(cachedAmplitudeTimeResults, amplitude_time_cache_file)
+    else:
+        cachedAmplitudeTimeResults = solarToolbox.loadPickle(amplitude_time_cache_file)
+        bestModel_amplitude_time = cachedAmplitudeTimeResults['bestModel_amplitude_time']
+        bestDrivers_amplitude_time = cachedAmplitudeTimeResults['bestDrivers_amplitude_time']
+        preds_amplitude_time = cachedAmplitudeTimeResults['preds_amplitude_time']
+        preds_amplitude_time_CI = cachedAmplitudeTimeResults['preds_amplitude_time_CI']
 
     # 6 - Correlation plot between FOCI results and Solar Cycle Max Amplitude & and Solar Cycle Time and Max Amplitude:
+    # For Amplitude...
+    fig, axs = plt.subplots(1, 3)
+    fig.set_size_inches(16, 6)
+    titles = ['$f_{1, A}$', '$f_{2, A}$', '$f_{3, A}$']
+    xlabels = ['$X_{A, 1}$', '$X_{A, 2}$', '$X_{A, 3}$']
+    for i, ax in enumerate(axs):
+        XX = bestModel_amplitude.generate_X_grid(term=i)
+        ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX))
+        ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
+        ax.set_xlabel(xlabels[i])
+        ax.set_title(titles[i])
+        if i == 0:
+            ax.set_ylabel('Contribution to $A_{\mathrm{max}}$')
+    fig.savefig(figures_directory+'/PDP_amplitude.png', dpi=300)
+
+    # For Time...
+    fig, axs = plt.subplots(1, 3)
+    fig.set_size_inches(16, 6)
+    titles = [r'$f_{1, \tau}$', r'$f_{2, \tau}$', r'$f_{3, \tau}$']
+    xlabels = [r'$X_{\tau, 1}$', r'$X_{\tau, 2}$', r'$X_{\tau, 3}$']
+    for i, ax in enumerate(axs):
+        XX = bestModel_amplitude_time.generate_X_grid(term=i)
+        ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX))
+        ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
+        ax.set_xlabel(xlabels[i])
+        ax.set_title(titles[i])
+        if i == 0:
+            ax.set_ylabel(r'Contribution to $\tau_{\mathrm{max}}$')
+    fig.savefig(figures_directory + '/PDP_amplitude_time.png', dpi=300)
 
     # 7 - Validation: Running this method for PAST cycles:
 
@@ -252,17 +309,12 @@ if __name__ == '__main__':
     plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='k')
     plt.axvline(x=smoothedTimes[cycleTroughs[-2]], color='r')
     plt.axvline(x=smoothedTimes[cycleTroughs[-1]], color='r')
-    # Forecasts:
-    # xerr_24 = timedelta(days=183.691699295)
-    # plt.errorbar(smoothedTimes[cycleTroughs[-2]]+timedelta(days=1945.3231866650622), 119.33312958127479, xerr=xerr_24,
-    #              yerr=21.4728627313, capsize=5, color='tab:orange', label='SC24 Hindcast')
-    # xerr_25 = timedelta(days=144.445330626)
-    # plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=1669.8092850056678), 137.83096839804202, xerr=xerr_25,
-    #              yerr=17.414084048, capsize=5, color='tab:green', label='SC25 Forecast')
+    # Hindcast:
     xerr_24 = timedelta(days=np.abs(preds_amplitude_time[0] - preds_amplitude_time_CI[0][0]))
     yerr_24 = preds_amplitude[0] - preds_amplitudeCI[0][0]
     plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[0], xerr=xerr_24,
                  yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast')
+    # Forecast
     xerr_25 = timedelta(days=np.abs(preds_amplitude_time[1] - preds_amplitude_time_CI[1][0]))
     yerr_25 = preds_amplitude[1] - preds_amplitudeCI[1][0]
     plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[1], xerr=xerr_25,

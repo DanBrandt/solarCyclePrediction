@@ -5,7 +5,7 @@
 import numpy as np
 from multiprocessing import shared_memory
 from functools import partial
-import time
+import time, os
 from multiprocessing import cpu_count
 from itertools import repeat
 from multiprocessing import Pool
@@ -121,6 +121,10 @@ def relate(drivers, true_data, subset_number, test_data, lambda_range=None):
 
     # Rigorously:
     print('Tuning the smoothing parameter...')
+    kf = KFold(n_splits=10, shuffle=False)
+    my_drivers = np.asarray([element[-1] for element in downselected_input_data])
+    kf.get_n_splits(my_drivers.T)
+    cross_val_results = []
     numLambdas = 1000
     if lambda_range is None:
         lambdas = np.linspace(0, 1e6, numLambdas)
@@ -132,22 +136,58 @@ def relate(drivers, true_data, subset_number, test_data, lambda_range=None):
     models = []
     model_error = []
     aicc_vals = []
-    for lam in tqdm(lambdas):
-        gam = LinearGAM(eval(arguments), lam=lam).fit(X, y)
-        models.append(gam)
-        res = gam.predict(X)
-        mse = mean_squared_error(true_data[-1], res)
-        model_error.append(mse)
-        my_aicc = gam._estimate_AICc(mu=res, y=true_data[-1])
-        aicc_vals.append(my_aicc)
-    best_model_ind = np.argmin(aicc_vals)
-    myGam = models[best_model_ind]
-    print('Best model found; best lambda = '+str(lambdas[best_model_ind]))
-    # View the model results:
-    # plt.figure()
-    # plt.plot(lambdas, aicc_vals)
-    # plt.xlabel('Lambda')
-    # plt.ylabel('AICc')
+    scores = np.zeros((10, lambdas.shape[0]), dtype=float)
+    cache_file = 'model_cache_'+true_data[0]+'.pkl'
+    if os.path.isfile(cache_file) != True:
+        for j, (train_index, test_index) in enumerate(kf.split(my_drivers.T)):
+            print(f"Fold {j+1}:")
+            print(f"  Train: index={train_index}")
+            print(f"  Test:  index={test_index}")
+            for k, lam in tqdm(enumerate(lambdas)):
+                gam = LinearGAM(eval(arguments), lam=lam).fit(X, y)
+                models.append(gam)
+                res = gam.predict(X)
+                mse = mean_squared_error(true_data[-1], res)
+                model_error.append(mse)
+                my_aicc = gam._estimate_AICc(mu=res, y=true_data[-1])
+                aicc_vals.append(my_aicc)
+                scores[j, k] = my_aicc
+        # best_model_ind = np.argmin(aicc_vals)
+        # myGam = models[best_model_ind]
+        # print('Best model found; best lambda = '+str(lambdas[best_model_ind]))
+        # View the model results:
+        # plt.figure()
+        # plt.plot(lambdas, aicc_vals)
+        # plt.xlabel('Lambda')
+        # plt.ylabel('AICc')
+        cache = {'scores': scores}
+        solarToolbox.savePickle(cache, '../results/'+cache_file)
+    else:
+        cache = solarToolbox.loadPickle('../results/'+cache_file)
+        scores = cache['scores']
+
+    # Perform one more fit, but using ALL the data, but with the value of lambda corresponding to the best model:
+    mean_scores = np.mean(scores, axis=0)  # We take the mean across the folds in order to maximize generalizability.
+    best_single_score_ind = np.argmin(mean_scores)
+    best_lambda = lambdas[best_single_score_ind]
+    myGam = LinearGAM(eval(arguments), lam=best_lambda).fit(X, y)
+
+    # Plot of the aicc values:
+    # from mpl_toolkits.mplot3d import Axes3D
+    # xg, yg = np.meshgrid(np.linspace(1,10,10), lambdas)
+    # hf = plt.figure()
+    # ha = hf.add_subplot(111, projection='3d')
+    # ha.plot_surface(xg, yg, scores.T)
+    plt.figure(figsize=(8,6))
+    plt.plot(lambdas, mean_scores, linewidth=3)
+    plt.axhline(y=mean_scores[best_single_score_ind], linestyle='--', color='k')
+    plt.axvline(x=best_lambda, linestyle='--', color='k')
+    plt.scatter(best_lambda, mean_scores[best_single_score_ind], color='r', s=50)
+    plt.xlim([np.min(lambdas), np.max(lambdas)])
+    plt.xlabel('$\lambda$')
+    plt.ylabel('AICc')
+    plt.savefig('../results/figures/aicc_vs_lambda_'+true_data[0]+'.png', dpi=300)
+    # TODO: Save the above plot
 
     # # More Rigourously...
     # print('Fitting GAMs...')

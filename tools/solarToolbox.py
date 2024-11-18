@@ -10,7 +10,7 @@ matplotlib.use('Qt5Agg')
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.optimize import curve_fit
 from sklearn.metrics import r2_score
-import math
+import math, pickle
 # ----------------------------------------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -349,6 +349,29 @@ def subset_data(times, vals, boundaries):
 
 def orderOfMagnitude(number):
     return math.floor(math.log(number, 10))
+
+def savePickle(data, pickleFilename):
+    """
+    Given some data (a list, dict, or array), save it is a pickle file with a user-supplied name.
+    :param: data
+        A variable referring to data to be saved as a pickle.
+    :param: pickleFilename, str
+        A string with which to name the pickle file to be saved.
+    """
+    with open(pickleFilename, 'wb') as pickleFile:
+        pickle.dump(data, pickleFile, protocol=pickle.HIGHEST_PROTOCOL)
+
+def loadPickle(pickleFilename):
+    """
+    Given the name of a (pre-existing) pickle file, load its contents.
+    :param: pickleFilename, str
+        A string with the location/name of the filename.
+    :return: var
+        The loaded data.
+    """
+    with open(pickleFilename, 'rb') as pickleFile:
+        var = pickle.load(pickleFile)
+    return var
 # ----------------------------------------------------------------------------------------------------------------------
 
 
