@@ -203,12 +203,14 @@ def relate(drivers, true_data, subset_number, test_data, lambda_range=None):
     # Uncertainty...
     res24_CI = myGam.prediction_intervals([X[-1, :]], width=0.68)
     res25_CI = myGam.prediction_intervals(np.array([[element[-1] for element in downselected_test_data]]), width=0.68)
+    res24_CI_95 = myGam.prediction_intervals([X[-1, :]], width=0.95)
+    res25_CI_95 = myGam.prediction_intervals(np.array([[element[-1] for element in downselected_test_data]]), width=0.95)
 
     # Print results:
-    print('SC24 hindcast: '+str(res24_final[0])+' 68% CI: '+str(res24_CI[0]))
-    print('SC25 forecast: ' + str(res25_final[0]) + ' 68% CI: ' + str(res25_CI[0]))
+    print('SC24 hindcast: '+str(res24_final[0])+' 68% CI: '+str(res24_CI[0]) + ', : 95% CI: '+str(res24_CI_95[0]))
+    print('SC25 forecast: ' + str(res25_final[0]) + ' 68% CI: ' + str(res25_CI[0]) + ', : 95% CI: '+str(res25_CI_95[0]))
 
-    return myGam, downselected_input_data, [res24_final[0], res25_final[0]], [res24_CI[0], res25_CI[0]]
+    return myGam, downselected_input_data, [res24_final[0], res25_final[0]], [res24_CI[0], res25_CI[0]], downselected_test_data
 
 def get_cross_terms(data):
     '''

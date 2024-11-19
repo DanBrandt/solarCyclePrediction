@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 import sys, os
 from datetime import datetime, timedelta
+from sklearn.metrics import r2_score
 
 # Local imports:
 from tools import solarToolbox
@@ -141,7 +142,7 @@ if __name__ == '__main__':
     # plt.savefig(figures_directory + 'superposedSolarCyclesMethod2.png', dpi=300)
     # E-folding times:
     cycleEFoldingTimes = np.array(
-        [solarToolbox.eFold(element)[0] for element in superposedMonthlySSN]) / 12.  # In units of years
+        [solarToolbox.eFold(element)[0] for element in superposedSmoothedSSN]) / 12.  # In units of years (formerly did this with superposedMonthlySSN)
     # Observing the Gnevyshev-Ohl Rule:
     cycleSums = np.array([np.sum(element) for element in superposedMonthlySSN])
     xAxis = np.linspace(1, len(cycleSums), len(cycleSums))
@@ -211,6 +212,7 @@ if __name__ == '__main__':
         ['MaxAmplitude', cycleNum[:-1], maxAmplitudes[:-1]],
         ['MinAmplitude', cycleNum[:-1], minAmplitudes[:-1]],
         ['AscentTime', cycleNum[:-1], cycleAscendingTimes[:-1]],
+        ['DescentTime', cycleNum[:-1], cycleDescendingTimes[:-1]],
         ['CycleLength', cycleNum[:-1], cycleLengths[:-1]],
         ['AscentRate', cycleNum[:-1], ascentRatesSmoothed[:-1]],
         ['DescentRate', cycleNum[:-1], descentRatesSmoothed[:-1]],
@@ -223,6 +225,7 @@ if __name__ == '__main__':
         maxAmplitudes[-1],
         minAmplitudes[-1],
         cycleAscendingTimes[-1],
+        cycleDescendingTimes[-1],
         cycleLengths[-1],
         ascentRatesSmoothed[-1],
         descentRatesSmoothed[-1],
@@ -233,15 +236,17 @@ if __name__ == '__main__':
     print(sc_drivers_for_forecasting)
 
     # 5 - Results of FOCI:
+    override = False
     amplitude_cache_file = '../results/amplitude_cache.pkl'
     true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
-    if os.path.isfile(amplitude_cache_file) == False:
-        bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
+    if os.path.isfile(amplitude_cache_file) == False or override == True:
+        bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI, bestDrivers_amplitude_test  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
         cachedAmplitudeResults = {
             'bestModel_amplitude': bestModel_amplitude,
             'bestDrivers_amplitude': bestDrivers_amplitude,
             'preds_amplitude': preds_amplitude,
-            'preds_amplitudeCI': preds_amplitudeCI
+            'preds_amplitudeCI': preds_amplitudeCI,
+            'bestDrivers_amplitude_test': bestDrivers_amplitude_test
         }
         solarToolbox.savePickle(cachedAmplitudeResults, amplitude_cache_file)
     else:
@@ -250,17 +255,20 @@ if __name__ == '__main__':
         bestDrivers_amplitude = cachedAmplitudeResults['bestDrivers_amplitude']
         preds_amplitude = cachedAmplitudeResults['preds_amplitude']
         preds_amplitudeCI = cachedAmplitudeResults['preds_amplitudeCI']
+        bestDrivers_amplitude_test = cachedAmplitudeResults['bestDrivers_amplitude_test']
 
     # TODO: Fix the fact that we cannot run FOCI immediately a second time (when results from the above ARE NOT cached).
+    override = True
     amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
     true_data_max_amplitude_time = ['nextMaxAmplitudeTime', cycleNum[1:], np.asarray(cycleAscendingTimes[1:])]
-    if os.path.isfile(amplitude_time_cache_file) == False:
-        bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.014432,0.014434])
+    if os.path.isfile(amplitude_time_cache_file) == False or override == True:
+        bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI, bestDrivers_amplitude_time_test = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.0195, 0.0200]) # [0.014432,0.014434]
         cachedAmplitudeTimeResults = {
             'bestModel_amplitude_time': bestModel_amplitude_time,
             'bestDrivers_amplitude_time': bestDrivers_amplitude_time,
             'preds_amplitude_time': preds_amplitude_time,
-            'preds_amplitude_time_CI': preds_amplitude_time_CI
+            'preds_amplitude_time_CI': preds_amplitude_time_CI,
+            'bestDrivers_amplitude_time_test': bestDrivers_amplitude_time_test
         }
         solarToolbox.savePickle(cachedAmplitudeTimeResults, amplitude_time_cache_file)
     else:
@@ -269,8 +277,45 @@ if __name__ == '__main__':
         bestDrivers_amplitude_time = cachedAmplitudeTimeResults['bestDrivers_amplitude_time']
         preds_amplitude_time = cachedAmplitudeTimeResults['preds_amplitude_time']
         preds_amplitude_time_CI = cachedAmplitudeTimeResults['preds_amplitude_time_CI']
+        bestDrivers_amplitude_time_test = cachedAmplitudeTimeResults['bestDrivers_amplitude_time_test']
 
     # 6 - Correlation plot between FOCI results and Solar Cycle Max Amplitude & and Solar Cycle Time and Max Amplitude:
+    # For Amplitude...
+    X_past_amplitude = np.asarray([element[-1] for element in bestDrivers_amplitude]).T
+    hindcasts_amplitude = bestModel_amplitude.predict(X_past_amplitude)
+    plt.figure(figsize=(7,5))
+    plt.scatter(true_data_max_amplitude[2], hindcasts_amplitude, color='b', s=60)
+    plt.xlabel('$S_{\mathrm{N}}$')
+    plt.ylabel('$M_A$')
+    plt.axline((0, 0), slope=1, color='k', linestyle='--')
+    linearA = np.poly1d(np.polyfit(true_data_max_amplitude[2], hindcasts_amplitude, 1))
+    R2_A = r2_score(true_data_max_amplitude[2], hindcasts_amplitude)
+    x_extended_A = np.linspace(0, np.max(true_data_max_amplitude[2])+50, 100)
+    plt.plot(x_extended_A, linearA(x_extended_A), color='r', label='$R^2$='+str(np.round(R2_A,4))) #(np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
+    plt.title('$A_{\mathrm{max}}$: SC2 through SC24')
+    plt.xlim([x_extended_A[0], x_extended_A[-1]])
+    plt.legend(loc='best')
+    plt.savefig(figures_directory + '/amplitude_corr.png', dpi=300)
+
+    # For Time...
+    X_past_amplitude_time = np.asarray([element[-1] for element in bestDrivers_amplitude_time]).T
+    hindcasts_amplitude_time = bestModel_amplitude_time.predict(X_past_amplitude_time)
+    plt.figure(figsize=(7, 5))
+    plt.scatter(true_data_max_amplitude_time[2], hindcasts_amplitude_time, color='b', s=60)
+    plt.xlabel('$S_{\mathrm{N}}$')
+    plt.ylabel(r'$M_{\tau}$')
+    plt.axline((0, 0), slope=1, color='k', linestyle='--')
+    linearTau = np.poly1d(np.polyfit(true_data_max_amplitude_time[2], hindcasts_amplitude_time, 1))
+    R2_tau = r2_score(true_data_max_amplitude_time[2], hindcasts_amplitude_time)
+    x_extended_tau = np.linspace(0, np.max(true_data_max_amplitude_time[2]) + 50, 100)
+    plt.plot(x_extended_tau, linearTau(x_extended_tau), color='r', label='$R^2$=' + str(np.round(R2_tau,
+                                                                                           4)))  # (np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
+    plt.title(r'$\tau_{\mathrm{max}}$: SC2 through SC24')
+    plt.xlim([x_extended_tau[0], x_extended_tau[-1]])
+    plt.legend(loc='best')
+    plt.savefig(figures_directory + '/amplitude_time_corr.png', dpi=300)
+
+    # 7 - Partial Dependence Plots:
     # For Amplitude...
     fig, axs = plt.subplots(1, 3)
     fig.set_size_inches(16, 6)
@@ -301,24 +346,30 @@ if __name__ == '__main__':
             ax.set_ylabel(r'Contribution to $\tau_{\mathrm{max}}$')
     fig.savefig(figures_directory + '/PDP_amplitude_time.png', dpi=300)
 
-    # 7 - Validation: Running this method for PAST cycles:
+    # 8 - Validation: Running this method for PAST cycles:
 
-    # 8 - Hindcasting/Forecasting results (w/ 68% CI):
+    # 9 - Hindcasting/Forecasting results (w/ 68% CI):
     plt.figure(figsize=(18, 9))
     plt.plot(smoothedTimes[clippedCycleTroughs[-2]:][:-6], smoothedSpots[clippedCycleTroughs[-2]:][:-6], label=r'13-Month Smoothed $S_{\mathrm{N}}$')
-    plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='k')
+    plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='grey')
     plt.axvline(x=smoothedTimes[cycleTroughs[-2]], color='r')
     plt.axvline(x=smoothedTimes[cycleTroughs[-1]], color='r')
     # Hindcast:
     xerr_24 = timedelta(days=np.abs(preds_amplitude_time[0] - preds_amplitude_time_CI[0][0]))
     yerr_24 = preds_amplitude[0] - preds_amplitudeCI[0][0]
     plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[0], xerr=xerr_24,
-                 yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast')
+                 yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast', fmt='o')
     # Forecast
     xerr_25 = timedelta(days=np.abs(preds_amplitude_time[1] - preds_amplitude_time_CI[1][0]))
     yerr_25 = preds_amplitude[1] - preds_amplitudeCI[1][0]
     plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[1], xerr=xerr_25,
-                 yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast')
+                 yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast', fmt='o')
+    # Other forecasts:
+    asymmetric_yerr_noaa_nasa = np.array([[20, 15]]).T # https://www.weather.gov/news/190504-sun-activity-in-solar-cycle
+    plt.errorbar(datetime(2025,1,1) + timedelta(days=213.), 115., xerr=timedelta(days=244, seconds=47520), yerr=asymmetric_yerr_noaa_nasa, label='NOAA/NASA', fmt='ko', capsize=5) # 2025.583 +- 0.67
+    plt.errorbar(datetime(2024,1,1) + timedelta(days=228.), 149.5, xerr=timedelta(days=25, seconds=79488), yerr=11.5, label='WDC-SILSO', fmt='bo', capsize=5) # https://www.sidc.be/article/solar-cycle-25-maximum 2024.625+-0.208
+    asymmetric_yerr_mcintosh = np.array([[29, 21]]).T
+    plt.errorbar(datetime(2025,1,1) + timedelta(days=213.), 233, yerr=asymmetric_yerr_mcintosh, label='McIntosh, et al. 2020', fmt='co', capsize=5) # https://link.springer.com/article/10.1007/s11207-020-01723-y?utm_medium=affiliate&CJEVENT=12d7ea2df8b311ec8243005c0a82b824&utm_campaign=CONR_BOOKS_ECOM_GL_PHSS_ALWYS_DEEPLINK&utm_content=textlink&utm_source=commission_junction&utm_term=PID100052171
     # Axes/labels/saving:
     plt.xlabel('Date')
     plt.ylabel('$S_{\mathrm{N}}$')
