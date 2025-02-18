@@ -10,6 +10,7 @@ matplotlib.use('Qt5Agg')
 import sys, os
 from datetime import datetime, timedelta
 from sklearn.metrics import r2_score
+import csv
 
 # Local imports:
 from tools import solarToolbox
@@ -235,134 +236,319 @@ if __name__ == '__main__':
     ]
     print(sc_drivers_for_forecasting)
 
-    # 5 - Results of FOCI:
-    override = False
-    amplitude_cache_file = '../results/amplitude_cache.pkl'
-    true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
-    if os.path.isfile(amplitude_cache_file) == False or override == True:
-        bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI, bestDrivers_amplitude_test  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
-        cachedAmplitudeResults = {
-            'bestModel_amplitude': bestModel_amplitude,
-            'bestDrivers_amplitude': bestDrivers_amplitude,
-            'preds_amplitude': preds_amplitude,
-            'preds_amplitudeCI': preds_amplitudeCI,
-            'bestDrivers_amplitude_test': bestDrivers_amplitude_test
-        }
-        solarToolbox.savePickle(cachedAmplitudeResults, amplitude_cache_file)
-    else:
-        cachedAmplitudeResults = solarToolbox.loadPickle(amplitude_cache_file)
-        bestModel_amplitude = cachedAmplitudeResults['bestModel_amplitude']
-        bestDrivers_amplitude = cachedAmplitudeResults['bestDrivers_amplitude']
-        preds_amplitude = cachedAmplitudeResults['preds_amplitude']
-        preds_amplitudeCI = cachedAmplitudeResults['preds_amplitudeCI']
-        bestDrivers_amplitude_test = cachedAmplitudeResults['bestDrivers_amplitude_test']
+    #-------------------------------------------------------------------------------------------------------------------
 
-    # TODO: Fix the fact that we cannot run FOCI immediately a second time (when results from the above ARE NOT cached).
-    override = True
-    amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
+    mgcv = True # Determines whether the R code is used. If False, uses PyGAM (not recommended).
+    true_data_max_amplitude = ['nextMaxAmplitude', cycleNum[1:], maxAmplitudes[1:]]
     true_data_max_amplitude_time = ['nextMaxAmplitudeTime', cycleNum[1:], np.asarray(cycleAscendingTimes[1:])]
-    if os.path.isfile(amplitude_time_cache_file) == False or override == True:
-        bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI, bestDrivers_amplitude_time_test = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.0195, 0.0200]) # [0.014432,0.014434]
-        cachedAmplitudeTimeResults = {
-            'bestModel_amplitude_time': bestModel_amplitude_time,
-            'bestDrivers_amplitude_time': bestDrivers_amplitude_time,
-            'preds_amplitude_time': preds_amplitude_time,
-            'preds_amplitude_time_CI': preds_amplitude_time_CI,
-            'bestDrivers_amplitude_time_test': bestDrivers_amplitude_time_test
-        }
-        solarToolbox.savePickle(cachedAmplitudeTimeResults, amplitude_time_cache_file)
+    if not mgcv:
+        # 5 - Results of FOCI:
+        override = False
+        amplitude_cache_file = '../results/amplitude_cache.pkl'
+        if os.path.isfile(amplitude_cache_file) == False or override == True:
+            bestModel_amplitude, bestDrivers_amplitude, preds_amplitude, preds_amplitudeCI, bestDrivers_amplitude_test  = corFoci.relate(sc_drivers, true_data_max_amplitude, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.01328, 0.01329])
+            cachedAmplitudeResults = {
+                'bestModel_amplitude': bestModel_amplitude,
+                'bestDrivers_amplitude': bestDrivers_amplitude,
+                'preds_amplitude': preds_amplitude,
+                'preds_amplitudeCI': preds_amplitudeCI,
+                'bestDrivers_amplitude_test': bestDrivers_amplitude_test
+            }
+            solarToolbox.savePickle(cachedAmplitudeResults, amplitude_cache_file)
+        else:
+            cachedAmplitudeResults = solarToolbox.loadPickle(amplitude_cache_file)
+            bestModel_amplitude = cachedAmplitudeResults['bestModel_amplitude']
+            bestDrivers_amplitude = cachedAmplitudeResults['bestDrivers_amplitude']
+            preds_amplitude = cachedAmplitudeResults['preds_amplitude']
+            preds_amplitudeCI = cachedAmplitudeResults['preds_amplitudeCI']
+            bestDrivers_amplitude_test = cachedAmplitudeResults['bestDrivers_amplitude_test']
+
+        # TODO: Fix the fact that we cannot run FOCI immediately a second time (when results from the above ARE NOT cached).
+        override = False
+        amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
+        if os.path.isfile(amplitude_time_cache_file) == False or override == True:
+            bestModel_amplitude_time, bestDrivers_amplitude_time, preds_amplitude_time, preds_amplitude_time_CI, bestDrivers_amplitude_time_test = corFoci.relate(sc_drivers, true_data_max_amplitude_time, [5, 3], sc_drivers_for_forecasting, lambda_range=[0.0195, 0.0200]) # [0.014432,0.014434]
+            cachedAmplitudeTimeResults = {
+                'bestModel_amplitude_time': bestModel_amplitude_time,
+                'bestDrivers_amplitude_time': bestDrivers_amplitude_time,
+                'preds_amplitude_time': preds_amplitude_time,
+                'preds_amplitude_time_CI': preds_amplitude_time_CI,
+                'bestDrivers_amplitude_time_test': bestDrivers_amplitude_time_test
+            }
+            solarToolbox.savePickle(cachedAmplitudeTimeResults, amplitude_time_cache_file)
+        else:
+            cachedAmplitudeTimeResults = solarToolbox.loadPickle(amplitude_time_cache_file)
+            bestModel_amplitude_time = cachedAmplitudeTimeResults['bestModel_amplitude_time']
+            bestDrivers_amplitude_time = cachedAmplitudeTimeResults['bestDrivers_amplitude_time']
+            preds_amplitude_time = cachedAmplitudeTimeResults['preds_amplitude_time']
+            preds_amplitude_time_CI = cachedAmplitudeTimeResults['preds_amplitude_time_CI']
+            bestDrivers_amplitude_time_test = cachedAmplitudeTimeResults['bestDrivers_amplitude_time_test']
     else:
-        cachedAmplitudeTimeResults = solarToolbox.loadPickle(amplitude_time_cache_file)
-        bestModel_amplitude_time = cachedAmplitudeTimeResults['bestModel_amplitude_time']
-        bestDrivers_amplitude_time = cachedAmplitudeTimeResults['bestDrivers_amplitude_time']
-        preds_amplitude_time = cachedAmplitudeTimeResults['preds_amplitude_time']
-        preds_amplitude_time_CI = cachedAmplitudeTimeResults['preds_amplitude_time_CI']
-        bestDrivers_amplitude_time_test = cachedAmplitudeTimeResults['bestDrivers_amplitude_time_test']
+        # Compute all the mutual products; combine them into an array alongside the original drivers:
+        combined_drivers = sc_drivers
+        for i in range(len(combined_drivers)):
+            combined_drivers[i][-2] = list(combined_drivers[i][-2]) + [combined_drivers[i][-2][-1] + 1]
+            combined_drivers[i][-1] = list(combined_drivers[i][-1]) + [sc_drivers_for_forecasting[i]]
+        all_drivers_initial = corFoci.get_cross_terms(combined_drivers)  # This includes the testing item as well...
+
+        #---------------------------------------------------------------------------------------------------------------
+
+        # Scale all the input data using an affine transformation
+        scaled_sc_drivers_for_forecasting_amplitude = []
+        scaled_sc_drivers_for_forecasting_time = []
+        reference_range_amplitude = np.asarray([np.min(maxAmplitudes[1:]), np.max(maxAmplitudes[1:])])
+        reference_range_time = np.asarray([np.min(np.asarray(cycleAscendingTimes[1:])), np.max(np.asarray(cycleAscendingTimes[1:]))])
+        sc_drivers_only = [element[-1] for element in all_drivers_initial]
+        # Max Amplitude:
+        for item in sc_drivers_only:
+            current_range = np.asarray([np.min(item), np.max(item)])
+            slope = (reference_range_amplitude[1] - reference_range_amplitude[0]) / (current_range[1] - current_range[0])
+            def affine_transform(x):
+                y = slope * (x - current_range[0]) + reference_range_amplitude[0]
+                return y
+            transformed_data = affine_transform(item)
+            scaled_sc_drivers_for_forecasting_amplitude.append(transformed_data)
+        # Time of Max Amplitude:
+        for item in sc_drivers_only:
+            current_range = np.asarray([np.min(item), np.max(item)])
+            slope = (reference_range_time[1] - reference_range_time[0]) / (current_range[1] - current_range[0])
+            def affine_transform(x):
+                y = slope * (x - current_range[0]) + reference_range_time[0]
+                return y
+            transformed_data = affine_transform(item)
+            scaled_sc_drivers_for_forecasting_time.append(transformed_data)
+
+        #---------------------------------------------------------------------------------------------------------------
+
+        # Run FOCI:
+        n_feats_A = [10, 7]
+        n_feast_T = [10, 7]
+
+        # First Iteration...
+        indices_amplitude = corFoci.foci_main_38(maxAmplitudes[1:], np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T,
+                                  num_features=n_feats_A[0])
+        indices_time = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T,
+                                  num_features=n_feast_T[0])
+        # Second Iteration (sanity check)...
+        scaled_sc_drivers_for_forecasting_amplitude_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T[:, indices_amplitude]
+        scaled_sc_drivers_for_forecasting_time_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T[:, indices_time]
+        indices_amplitude_2 = corFoci.foci_main_38(maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_1, num_features=n_feats_A[-1])
+        indices_time_2 = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_1, num_features=n_feast_T[-1])
+        # Collect the downselected drivers...
+        scaled_sc_drivers_for_forecasting_amplitude_all = []
+        scaled_sc_drivers_for_forecasting_amplitude_all_info = []
+        for idx in indices_amplitude:
+            scaled_sc_drivers_for_forecasting_amplitude_all.append(all_drivers_initial[idx])
+        for idx2 in indices_amplitude_2:
+            scaled_sc_drivers_for_forecasting_amplitude_all_info.append(scaled_sc_drivers_for_forecasting_amplitude_all[idx2])
+        scaled_sc_drivers_for_forecasting_amplitude_foci_2 = scaled_sc_drivers_for_forecasting_amplitude_foci_1[:, indices_amplitude_2]
+        scaled_sc_drivers_for_forecasting_time_all = []
+        scaled_sc_drivers_for_forecasting_time_all_info = []
+        for idx in indices_time:
+            scaled_sc_drivers_for_forecasting_time_all.append(all_drivers_initial[idx])
+        for idx2 in indices_time_2:
+            scaled_sc_drivers_for_forecasting_time_all_info.append(scaled_sc_drivers_for_forecasting_time_all[idx2])
+        scaled_sc_drivers_for_forecasting_time_foci_2 = scaled_sc_drivers_for_forecasting_time_foci_1[:, indices_time_2]
+
+        #---------------------------------------------------------------------------------------------------------------
+
+        # Output the FOCI results to a .CSV file for use by MGCV...
+        # Amplitude...
+        nameStr = "FutureMaxAmplitude "+" ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_amplitude_all_info]))
+        full_data_amplitude = np.vstack((maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_2.T))
+        with open('../mgcv/full_data_amplitude.csv', 'w') as file:
+            file.write(nameStr)
+            file.write('\n')
+            for i in range(len(full_data_amplitude[1])):
+                line = " ".join(map(str, full_data_amplitude[:, i])) + "\n"
+                file.write(line)
+        # Time...
+        nameStr = "FutureMaxAmplitudeTime " + " ".join(
+            map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_time_all_info]))
+        full_data_amplitude_time = np.vstack((np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_2.T))
+        with open('../mgcv/full_data_amplitude_time.csv', 'w') as file:
+            file.write(nameStr)
+            file.write('\n')
+            for i in range(len(full_data_amplitude_time[1])):
+                line = " ".join(map(str, full_data_amplitude_time[:, i])) + "\n"
+                file.write(line)
+
+        # Save the drivers for the SC25 prediction:
+        # Amplitude...
+        fcast_drivers_amplitude_1 = np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[indices_amplitude, :]
+        fcast_drivers_amplitude_2 = fcast_drivers_amplitude_1[indices_amplitude_2, :][:, -1]
+        fcast_amplitude_nameStr = " ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_amplitude_all_info]))
+        with open('../mgcv/drivers_for_forecasting_amplitude.csv', 'w') as file:
+            file.write(fcast_amplitude_nameStr)
+            file.write('\n')
+            line = " ".join(map(str, fcast_drivers_amplitude_2)) + "\n"
+            file.write(line)
+        # Time...
+        fcast_drivers_time_1 = np.asarray(scaled_sc_drivers_for_forecasting_time)[indices_time, :]
+        fcast_drivers_time_2 = fcast_drivers_time_1[indices_time_2, :][:, -1]
+        fcast_time_nameStr = " ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_time_all_info]))
+        with open('../mgcv/drivers_for_forecasting_time.csv', 'w') as file:
+            file.write(fcast_time_nameStr)
+            file.write('\n')
+            line = " ".join(map(str, fcast_drivers_time_2)) + "\n"
+            file.write(line)
+
+        # Save the drivers for the SC24 hindcast:
+        # Amplitude...
+        hcast_drivers_amplitude_2 = fcast_drivers_amplitude_1[indices_amplitude_2, :][:, -2]
+        hcast_amplitude_nameStr = " ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_amplitude_all_info]))
+        with open('../mgcv/drivers_for_hindcasting_amplitude.csv', 'w') as file:
+            file.write(hcast_amplitude_nameStr)
+            file.write('\n')
+            line = " ".join(map(str, hcast_drivers_amplitude_2)) + "\n"
+            file.write(line)
+        # Time...
+        hcast_drivers_time_2 = fcast_drivers_time_1[indices_time_2, :][:, -2]
+        hcast_time_nameStr = " ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_time_all_info]))
+        with open('../mgcv/drivers_for_hindcasting_time.csv', 'w') as file:
+            file.write(hcast_time_nameStr)
+            file.write('\n')
+            line = " ".join(map(str, hcast_drivers_time_2)) + "\n"
+            file.write(line)
+        #---------------------------------------------------------------------------------------------------------------
+        # Run/Load in results from the MGCV R code:
+        # HINDCAST
+        # Amplitude...
+        with open('../mgcv/gam_hindcasts_amplitude.csv', newline='\n') as gam_hinds_amplitude:
+            gp_ha = list(csv.reader(gam_hinds_amplitude))
+        with open('../mgcv/gam_upr_hindcasts_amplitude.csv', newline='\n') as gam_hinds_upr_amplitude:
+            gp_upr_ha = list(csv.reader(gam_hinds_upr_amplitude))
+        with open('../mgcv/gam_lwr_hindcasts_amplitude.csv', newline='\n') as gam_hinds_lwr_amplitude:
+            gp_lwr_ha = list(csv.reader(gam_hinds_lwr_amplitude))
+
+        # Time...
+        with open('../mgcv/gam_hindcasts_amplitude_time.csv', newline='\n') as gam_hinds_time:
+            gp_ht = list(csv.reader(gam_hinds_time))
+        with open('../mgcv/gam_upr_hindcasts_amplitude_time.csv', newline='\n') as gam_hinds_upr_time:
+            gp_upr_ht = list(csv.reader(gam_hinds_upr_time))
+        with open('../mgcv/gam_lwr_hindcasts_amplitude_time.csv', newline='\n') as gam_hinds_lwr_time:
+            gp_lwr_ht = list(csv.reader(gam_hinds_lwr_time))
+
+        # FORECAST
+        # Amplitude...
+        with open('../mgcv/gam_predictions_amplitude.csv', newline='\n') as gam_preds_amplitude:
+            gp_a = list(csv.reader(gam_preds_amplitude))
+        with open('../mgcv/gam_upr_amplitude.csv', newline='\n') as gam_preds_upr_amplitude:
+            gp_upr_a = list(csv.reader(gam_preds_upr_amplitude))
+        with open('../mgcv/gam_lwr_amplitude.csv', newline='\n') as gam_preds_lwr_amplitude:
+            gp_lwr_a = list(csv.reader(gam_preds_lwr_amplitude))
+
+        # Time...
+        with open('../mgcv/gam_predictions_amplitude_time.csv', newline='\n') as gam_preds_time:
+            gp_t = list(csv.reader(gam_preds_time))
+        with open('../mgcv/gam_upr_amplitude_time.csv', newline='\n') as gam_preds_upr_time:
+            gp_upr_t = list(csv.reader(gam_preds_upr_time))
+        with open('../mgcv/gam_lwr_amplitude_time.csv', newline='\n') as gam_preds_lwr_time:
+            gp_lwr_t = list(csv.reader(gam_preds_lwr_time))
+        #---------------------------------------------------------------------------------------------------------------
 
     # 6 - Correlation plot between FOCI results and Solar Cycle Max Amplitude & and Solar Cycle Time and Max Amplitude:
     # For Amplitude...
-    X_past_amplitude = np.asarray([element[-1] for element in bestDrivers_amplitude]).T
-    hindcasts_amplitude = bestModel_amplitude.predict(X_past_amplitude)
-    plt.figure(figsize=(7,5))
-    plt.scatter(true_data_max_amplitude[2], hindcasts_amplitude, color='b', s=60)
-    plt.xlabel('$S_{\mathrm{N}}$')
-    plt.ylabel('$M_A$')
-    plt.axline((0, 0), slope=1, color='k', linestyle='--')
-    linearA = np.poly1d(np.polyfit(true_data_max_amplitude[2], hindcasts_amplitude, 1))
-    R2_A = r2_score(true_data_max_amplitude[2], hindcasts_amplitude)
-    x_extended_A = np.linspace(0, np.max(true_data_max_amplitude[2])+50, 100)
-    plt.plot(x_extended_A, linearA(x_extended_A), color='r', label='$R^2$='+str(np.round(R2_A,4))) #(np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
-    plt.title('$A_{\mathrm{max}}$: SC2 through SC24')
-    plt.xlim([x_extended_A[0], x_extended_A[-1]])
-    plt.legend(loc='best')
-    plt.savefig(figures_directory + '/amplitude_corr.png', dpi=300)
+    # X_past_amplitude = np.asarray([element[-1] for element in bestDrivers_amplitude]).T
+    # hindcasts_amplitude = bestModel_amplitude.predict(X_past_amplitude)
+    # plt.figure(figsize=(7,5))
+    # plt.scatter(true_data_max_amplitude[2], hindcasts_amplitude, color='b', s=60)
+    # plt.xlabel('$S_{\mathrm{N}}$')
+    # plt.ylabel('$M_A$')
+    # plt.axline((0, 0), slope=1, color='k', linestyle='--')
+    # linearA = np.poly1d(np.polyfit(true_data_max_amplitude[2], hindcasts_amplitude, 1))
+    # R2_A = r2_score(true_data_max_amplitude[2], hindcasts_amplitude)
+    # x_extended_A = np.linspace(0, np.max(true_data_max_amplitude[2])+50, 100)
+    # plt.plot(x_extended_A, linearA(x_extended_A), color='r', label='$R^2$='+str(np.round(R2_A,4))) #(np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
+    # plt.title('$A_{\mathrm{max}}$: SC2 through SC24')
+    # plt.xlim([x_extended_A[0], x_extended_A[-1]])
+    # plt.legend(loc='best')
+    # plt.savefig(figures_directory + '/amplitude_corr.png', dpi=300)
 
     # For Time...
-    X_past_amplitude_time = np.asarray([element[-1] for element in bestDrivers_amplitude_time]).T
-    hindcasts_amplitude_time = bestModel_amplitude_time.predict(X_past_amplitude_time)
-    plt.figure(figsize=(7, 5))
-    plt.scatter(true_data_max_amplitude_time[2], hindcasts_amplitude_time, color='b', s=60)
-    plt.xlabel('$S_{\mathrm{N}}$')
-    plt.ylabel(r'$M_{\tau}$')
-    plt.axline((0, 0), slope=1, color='k', linestyle='--')
-    linearTau = np.poly1d(np.polyfit(true_data_max_amplitude_time[2], hindcasts_amplitude_time, 1))
-    R2_tau = r2_score(true_data_max_amplitude_time[2], hindcasts_amplitude_time)
-    x_extended_tau = np.linspace(0, np.max(true_data_max_amplitude_time[2]) + 50, 100)
-    plt.plot(x_extended_tau, linearTau(x_extended_tau), color='r', label='$R^2$=' + str(np.round(R2_tau,
-                                                                                           4)))  # (np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
-    plt.title(r'$\tau_{\mathrm{max}}$: SC2 through SC24')
-    plt.xlim([x_extended_tau[0], x_extended_tau[-1]])
-    plt.legend(loc='best')
-    plt.savefig(figures_directory + '/amplitude_time_corr.png', dpi=300)
+    # X_past_amplitude_time = np.asarray([element[-1] for element in bestDrivers_amplitude_time]).T
+    # hindcasts_amplitude_time = bestModel_amplitude_time.predict(X_past_amplitude_time)
+    # plt.figure(figsize=(7, 5))
+    # plt.scatter(true_data_max_amplitude_time[2], hindcasts_amplitude_time, color='b', s=60)
+    # plt.xlabel('$S_{\mathrm{N}}$')
+    # plt.ylabel(r'$M_{\tau}$')
+    # plt.axline((0, 0), slope=1, color='k', linestyle='--')
+    # linearTau = np.poly1d(np.polyfit(true_data_max_amplitude_time[2], hindcasts_amplitude_time, 1))
+    # R2_tau = r2_score(true_data_max_amplitude_time[2], hindcasts_amplitude_time)
+    # x_extended_tau = np.linspace(0, np.max(true_data_max_amplitude_time[2]) + 50, 100)
+    # plt.plot(x_extended_tau, linearTau(x_extended_tau), color='r', label='$R^2$=' + str(np.round(R2_tau,
+    #                                                                                        4)))  # (np.unique(true_data_max_amplitude[2]), linearA(np.unique(true_data_max_amplitude[2])), color='r')
+    # plt.title(r'$\tau_{\mathrm{max}}$: SC2 through SC24')
+    # plt.xlim([x_extended_tau[0], x_extended_tau[-1]])
+    # plt.legend(loc='best')
+    # plt.savefig(figures_directory + '/amplitude_time_corr.png', dpi=300)
 
     # 7 - Partial Dependence Plots:
     # For Amplitude...
-    fig, axs = plt.subplots(1, 3)
-    fig.set_size_inches(16, 6)
-    titles = ['$f_{1, A}$', '$f_{2, A}$', '$f_{3, A}$']
-    xlabels = ['$X_{A, 1}$', '$X_{A, 2}$', '$X_{A, 3}$']
-    for i, ax in enumerate(axs):
-        XX = bestModel_amplitude.generate_X_grid(term=i)
-        ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX))
-        ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
-        ax.set_xlabel(xlabels[i])
-        ax.set_title(titles[i])
-        if i == 0:
-            ax.set_ylabel('Contribution to $A_{\mathrm{max}}$')
-    fig.savefig(figures_directory+'/PDP_amplitude.png', dpi=300)
+    # fig, axs = plt.subplots(1, 3)
+    # fig.set_size_inches(16, 6)
+    # titles = ['$f_{1, A}$', '$f_{2, A}$', '$f_{3, A}$']
+    # xlabels = ['$X_{A, 1}$', '$X_{A, 2}$', '$X_{A, 3}$']
+    # for i, ax in enumerate(axs):
+    #     XX = bestModel_amplitude.generate_X_grid(term=i)
+    #     ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX))
+    #     ax.plot(XX[:, i], bestModel_amplitude.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
+    #     ax.set_xlabel(xlabels[i])
+    #     ax.set_title(titles[i])
+    #     if i == 0:
+    #         ax.set_ylabel('Contribution to $A_{\mathrm{max}}$')
+    # fig.savefig(figures_directory+'/PDP_amplitude.png', dpi=300)
 
     # For Time...
-    fig, axs = plt.subplots(1, 3)
-    fig.set_size_inches(16, 6)
-    titles = [r'$f_{1, \tau}$', r'$f_{2, \tau}$', r'$f_{3, \tau}$']
-    xlabels = [r'$X_{\tau, 1}$', r'$X_{\tau, 2}$', r'$X_{\tau, 3}$']
-    for i, ax in enumerate(axs):
-        XX = bestModel_amplitude_time.generate_X_grid(term=i)
-        ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX))
-        ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
-        ax.set_xlabel(xlabels[i])
-        ax.set_title(titles[i])
-        if i == 0:
-            ax.set_ylabel(r'Contribution to $\tau_{\mathrm{max}}$')
-    fig.savefig(figures_directory + '/PDP_amplitude_time.png', dpi=300)
+    # fig, axs = plt.subplots(1, 3)
+    # fig.set_size_inches(16, 6)
+    # titles = [r'$f_{1, \tau}$', r'$f_{2, \tau}$', r'$f_{3, \tau}$']
+    # xlabels = [r'$X_{\tau, 1}$', r'$X_{\tau, 2}$', r'$X_{\tau, 3}$']
+    # for i, ax in enumerate(axs):
+    #     XX = bestModel_amplitude_time.generate_X_grid(term=i)
+    #     ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX))
+    #     ax.plot(XX[:, i], bestModel_amplitude_time.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
+    #     ax.set_xlabel(xlabels[i])
+    #     ax.set_title(titles[i])
+    #     if i == 0:
+    #         ax.set_ylabel(r'Contribution to $\tau_{\mathrm{max}}$')
+    # fig.savefig(figures_directory + '/PDP_amplitude_time.png', dpi=300)
 
-    # 8 - Validation: Running this method for PAST cycles:
+    # TODO: Validation: Running this method for PAST cycles:
 
-    # 9 - Hindcasting/Forecasting results (w/ 68% CI):
+    # 8 - Hindcasting/Forecasting results (w/ 95% CI):
     plt.figure(figsize=(18, 9))
     plt.plot(smoothedTimes[clippedCycleTroughs[-2]:][:-6], smoothedSpots[clippedCycleTroughs[-2]:][:-6], label=r'13-Month Smoothed $S_{\mathrm{N}}$')
     plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='grey')
     plt.axvline(x=smoothedTimes[cycleTroughs[-2]], color='r')
     plt.axvline(x=smoothedTimes[cycleTroughs[-1]], color='r')
     # Hindcast:
-    xerr_24 = timedelta(days=np.abs(preds_amplitude_time[0] - preds_amplitude_time_CI[0][0]))
-    yerr_24 = preds_amplitude[0] - preds_amplitudeCI[0][0]
-    plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[0], xerr=xerr_24,
+    if not mgcv:
+        xerr_24 = timedelta(days=np.abs(preds_amplitude_time[0] - preds_amplitude_time_CI[0][0]))
+        yerr_24 = preds_amplitude[0] - preds_amplitudeCI[0][0]
+        pat = preds_amplitude_time[0]
+        pa = preds_amplitude[0]
+    else:
+        xerr_24 = timedelta(days=np.mean([float(gp_upr_ht[-1][-1]) - float(gp_ht[-1][-1]), float(gp_ht[-1][-1]) - float(gp_lwr_ht[-1][-1])]))
+        yerr_24 = np.mean([float(gp_ha[-1][-1]) - float(gp_lwr_ha[-1][-1]), float(gp_upr_ha[-1][-1]) - float(gp_ha[-1][-1])])
+        pat = float(gp_ht[-1][-1])
+        pa = float(gp_ha[-1][-1])
+    plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=pat), pa, xerr=xerr_24,
                  yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast', fmt='o')
     # Forecast
-    xerr_25 = timedelta(days=np.abs(preds_amplitude_time[1] - preds_amplitude_time_CI[1][0]))
-    yerr_25 = preds_amplitude[1] - preds_amplitudeCI[1][0]
-    plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=preds_amplitude_time[0]), preds_amplitude[1], xerr=xerr_25,
+    if not mgcv:
+        xerr_25 = timedelta(days=np.abs(preds_amplitude_time[1] - preds_amplitude_time_CI[1][0]))
+        yerr_25 = preds_amplitude[1] - preds_amplitudeCI[1][0]
+        pat = preds_amplitude_time[0]
+        pa = preds_amplitude[0]
+    else:
+        xerr_25 = timedelta(days=np.mean(
+            [float(gp_upr_t[-1][-1]) - float(gp_t[-1][-1]), float(gp_t[-1][-1]) - float(gp_lwr_t[-1][-1])]))
+        yerr_25 = np.mean(
+            [float(gp_a[-1][-1]) - float(gp_lwr_a[-1][-1]), float(gp_upr_a[-1][-1]) - float(gp_a[-1][-1])])
+        pat = float(gp_t[-1][-1])
+        pa = float(gp_a[-1][-1])
+    plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=pat), pa, xerr=xerr_25,
                  yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast', fmt='o')
     # Other forecasts:
     asymmetric_yerr_noaa_nasa = np.array([[20, 15]]).T # https://www.weather.gov/news/190504-sun-activity-in-solar-cycle
