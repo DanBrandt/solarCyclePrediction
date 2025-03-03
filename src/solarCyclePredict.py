@@ -325,15 +325,33 @@ if __name__ == '__main__':
         n_feast_T = [10, 7]
 
         # First Iteration...
-        indices_amplitude = corFoci.foci_main_38(maxAmplitudes[1:], np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T,
-                                  num_features=n_feats_A[0])
-        indices_time = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T,
-                                  num_features=n_feast_T[0])
+        if os.path.isfile('../results/indices_amplitude.pkl') == False:
+            indices_amplitude = corFoci.foci_main_38(maxAmplitudes[1:], np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T,
+                                      num_features=n_feats_A[0])
+            solarToolbox.savePickle(indices_amplitude, '../results/indices_amplitude.pkl')
+        else:
+            indices_amplitude = solarToolbox.loadPickle('../results/indices_amplitude.pkl')
+        if os.path.isfile('../results/indices_time.pkl') == False:
+            indices_time = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T,
+                                      num_features=n_feast_T[0])
+            solarToolbox.savePickle(indices_time, '../results/indices_time.pkl')
+        else:
+            indices_time = solarToolbox.loadPickle('../results/indices_time.pkl')
+
         # Second Iteration (sanity check)...
         scaled_sc_drivers_for_forecasting_amplitude_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T[:, indices_amplitude]
         scaled_sc_drivers_for_forecasting_time_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T[:, indices_time]
-        indices_amplitude_2 = corFoci.foci_main_38(maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_1, num_features=n_feats_A[-1])
-        indices_time_2 = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_1, num_features=n_feast_T[-1])
+        if os.path.isfile('../results/indices_amplitude_2.pkl') == False:
+            indices_amplitude_2 = corFoci.foci_main_38(maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_1, num_features=n_feats_A[-1])
+            solarToolbox.savePickle(indices_amplitude_2, '../results/indices_amplitude_2.pkl')
+        else:
+            indices_amplitude_2 = solarToolbox.loadPickle('../results/indices_amplitude_2.pkl')
+        if os.path.isfile('../results/indices_time_2.pkl') == False:
+            indices_time_2 = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_1, num_features=n_feast_T[-1])
+            solarToolbox.savePickle(indices_time_2, '../results/indices_time_2.pkl')
+        else:
+            indices_time_2 = solarToolbox.loadPickle('../results/indices_time_2.pkl')
+
         # Collect the downselected drivers...
         scaled_sc_drivers_for_forecasting_amplitude_all = []
         scaled_sc_drivers_for_forecasting_amplitude_all_info = []
@@ -516,9 +534,21 @@ if __name__ == '__main__':
 
     # TODO: Validation: Running this method for PAST cycles:
 
+    # Load in the PyGAM 'best SC max time' results ANYWAY and plot them if desired (they must exist first):
+    use_pygam_time_estimate = True
+    if use_pygam_time_estimate:
+        amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
+        if os.path.isfile(amplitude_time_cache_file) == True:
+            cachedAmplitudeTimeResults_pg = solarToolbox.loadPickle(amplitude_time_cache_file)
+            bestModel_amplitude_time_pg = cachedAmplitudeTimeResults_pg['bestModel_amplitude_time']
+            bestDrivers_amplitude_time_pg = cachedAmplitudeTimeResults_pg['bestDrivers_amplitude_time']
+            preds_amplitude_time_pg = cachedAmplitudeTimeResults_pg['preds_amplitude_time']
+            preds_amplitude_time_CI_pg = cachedAmplitudeTimeResults_pg['preds_amplitude_time_CI']
+            bestDrivers_amplitude_time_test_pg = cachedAmplitudeTimeResults_pg['bestDrivers_amplitude_time_test']
+
     # 8 - Hindcasting/Forecasting results (w/ 95% CI):
     plt.figure(figsize=(18, 9))
-    plt.plot(smoothedTimes[clippedCycleTroughs[-2]:][:-6], smoothedSpots[clippedCycleTroughs[-2]:][:-6], label=r'13-Month Smoothed $S_{\mathrm{N}}$')
+    plt.plot(smoothedTimes[clippedCycleTroughs[-2]:][:-6], smoothedSpots[clippedCycleTroughs[-2]:][:-6], label=r'13-Month Smoothed $S_{\mathrm{N}}$', lw=3)
     plt.axvline(x=smoothedTimes[cyclePeaks[-2]], color='grey')
     plt.axvline(x=smoothedTimes[cycleTroughs[-2]], color='r')
     plt.axvline(x=smoothedTimes[cycleTroughs[-1]], color='r')
@@ -529,12 +559,21 @@ if __name__ == '__main__':
         pat = preds_amplitude_time[0]
         pa = preds_amplitude[0]
     else:
-        xerr_24 = timedelta(days=np.mean([float(gp_upr_ht[-1][-1]) - float(gp_ht[-1][-1]), float(gp_ht[-1][-1]) - float(gp_lwr_ht[-1][-1])]))
+        if not use_pygam_time_estimate:
+            xerr_24 = timedelta(days=np.mean([float(gp_upr_ht[-1][-1]) - float(gp_ht[-1][-1]), float(gp_ht[-1][-1]) - float(gp_lwr_ht[-1][-1])]))
+        else:
+            xerr_24 = timedelta(days=np.abs(preds_amplitude_time_pg[0] - preds_amplitude_time_CI_pg[0][1]))
         yerr_24 = np.mean([float(gp_ha[-1][-1]) - float(gp_lwr_ha[-1][-1]), float(gp_upr_ha[-1][-1]) - float(gp_ha[-1][-1])])
         pat = float(gp_ht[-1][-1])
         pa = float(gp_ha[-1][-1])
-    plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=pat), pa, xerr=xerr_24,
-                 yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast', fmt='o')
+    if not use_pygam_time_estimate:
+        plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=pat), pa, xerr=xerr_24,
+                    yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast', fmt='o')
+    else:
+        pat = preds_amplitude_time_pg[0]
+        plt.errorbar(smoothedTimes[cycleTroughs[-2]] + timedelta(days=pat), pa, xerr=xerr_24,
+                     yerr=yerr_24, capsize=5, color='tab:orange', label='SC24 Hindcast', fmt='o')
+
     # Forecast
     if not mgcv:
         xerr_25 = timedelta(days=np.abs(preds_amplitude_time[1] - preds_amplitude_time_CI[1][0]))
@@ -542,14 +581,22 @@ if __name__ == '__main__':
         pat = preds_amplitude_time[0]
         pa = preds_amplitude[0]
     else:
-        xerr_25 = timedelta(days=np.mean(
-            [float(gp_upr_t[-1][-1]) - float(gp_t[-1][-1]), float(gp_t[-1][-1]) - float(gp_lwr_t[-1][-1])]))
+        if not use_pygam_time_estimate:
+            xerr_25 = timedelta(days=np.mean(
+                [float(gp_upr_t[-1][-1]) - float(gp_t[-1][-1]), float(gp_t[-1][-1]) - float(gp_lwr_t[-1][-1])]))
+        else:
+            xerr_25 = timedelta(days=np.abs(preds_amplitude_time_pg[1] - preds_amplitude_time_CI_pg[1][1]))
         yerr_25 = np.mean(
             [float(gp_a[-1][-1]) - float(gp_lwr_a[-1][-1]), float(gp_upr_a[-1][-1]) - float(gp_a[-1][-1])])
         pat = float(gp_t[-1][-1])
         pa = float(gp_a[-1][-1])
-    plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=pat), pa, xerr=xerr_25,
-                 yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast', fmt='o')
+    if not use_pygam_time_estimate:
+        plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=pat), pa, xerr=xerr_25,
+                    yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast', fmt='o')
+    else:
+        pat = preds_amplitude_time_pg[1]
+        plt.errorbar(smoothedTimes[cycleTroughs[-1]] + timedelta(days=pat), pa, xerr=xerr_25,
+                     yerr=yerr_25, capsize=5, color='tab:green', label='SC25 Forecast', fmt='o')
     # Other forecasts:
     asymmetric_yerr_noaa_nasa = np.array([[20, 15]]).T # https://www.weather.gov/news/190504-sun-activity-in-solar-cycle
     plt.errorbar(datetime(2025,1,1) + timedelta(days=213.), 115., xerr=timedelta(days=244, seconds=47520), yerr=asymmetric_yerr_noaa_nasa, label='NOAA/NASA', fmt='ko', capsize=5) # 2025.583 +- 0.67
