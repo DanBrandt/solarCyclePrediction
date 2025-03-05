@@ -212,12 +212,14 @@ def relate(drivers, true_data, subset_number, test_data, lambda_range=None):
 
     return myGam, downselected_input_data, [res24_final[0], res25_final[0]], [res24_CI[0], res25_CI[0]], downselected_test_data
 
-def get_cross_terms(data):
+def get_cross_terms(data, truncOrder=2):
     '''
     Given some 2D array (rows being observations and columns being individual data streams), compute all possible cross-
     terms and return them, along with the original data streams.
     :param data: numpy.ndarray
         The data with which to obtain cross-terms.
+    :param truncOrder: int
+        The largest order of term to keep. Default is 2.
     :return expanded_data: numpy.ndarray
         The data with all possible cross-terms included.
     '''
@@ -225,6 +227,16 @@ def get_cross_terms(data):
     all_cross_terms_indices = uniqueCombs(data)
     all_cross_terms = []  # Each element itself has two elements: (0) time values, (1) cross-term value
     j = 0
+
+    if truncOrder:
+        # Optional truncation to terms only BELOW a certain order:
+        orders = np.asarray([len(element) for element in all_cross_terms_indices])
+        good_terms = np.where((orders) <= truncOrder)[0]
+        trunc_cross_terms_indices = []
+        for term in good_terms:
+            trunc_cross_terms_indices.append(all_cross_terms_indices[term])
+        all_cross_terms_indices = trunc_cross_terms_indices
+
     for indices in all_cross_terms_indices:
         print('Iteration: ' + str(j + 1) + '/' + str(len(all_cross_terms_indices)))
         currentTerms = [data[element] for element in indices]
@@ -755,7 +767,7 @@ def foci_main_38(Y, X, num_features = None, stop = True):
 
     X_shm_buffer.unlink()
     Y_shm_buffer.unlink()
-    return index_select
+    return index_select, Q
 
 def _estimateQ(Y, X):
     # For now, we'll only handle the case without any repeats

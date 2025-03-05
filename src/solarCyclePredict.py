@@ -201,8 +201,8 @@ if __name__ == '__main__':
     axs[1].plot(cycleNum, minAmplitudes)
     axs[2].plot(cycleNum, cycleAscendingTimes)
     axs[3].plot(cycleNum, cycleLengths)
-    axs[4].plot(cycleNum, ascentRatesSmoothed)
-    axs[5].plot(cycleNum, descentRatesSmoothed)
+    # axs[4].plot(cycleNum, ascentRatesSmoothed)
+    # axs[5].plot(cycleNum, descentRatesSmoothed)
     axs[6].plot(cycleNum, ratiosSmoothed)
     axs[7].plot(cycleNum, cycleAreas)
     axs[8].plot(cycleNum, cycleEFoldingTimes)
@@ -215,8 +215,8 @@ if __name__ == '__main__':
         ['AscentTime', cycleNum[:-1], cycleAscendingTimes[:-1]],
         ['DescentTime', cycleNum[:-1], cycleDescendingTimes[:-1]],
         ['CycleLength', cycleNum[:-1], cycleLengths[:-1]],
-        ['AscentRate', cycleNum[:-1], ascentRatesSmoothed[:-1]],
-        ['DescentRate', cycleNum[:-1], descentRatesSmoothed[:-1]],
+        # ['AscentRate', cycleNum[:-1], ascentRatesSmoothed[:-1]],
+        # ['DescentRate', cycleNum[:-1], descentRatesSmoothed[:-1]],
         ['AscentDescentRatio', cycleNum[:-1], ratiosSmoothed[:-1]],
         ['CycleArea', cycleNum[:-1], cycleAreas[:-1]],
         ['CycleEFoldingTime', cycleNum[:-1], cycleEFoldingTimes[:-1]]
@@ -228,8 +228,8 @@ if __name__ == '__main__':
         cycleAscendingTimes[-1],
         cycleDescendingTimes[-1],
         cycleLengths[-1],
-        ascentRatesSmoothed[-1],
-        descentRatesSmoothed[-1],
+        # ascentRatesSmoothed[-1],
+        # descentRatesSmoothed[-1],
         ratiosSmoothed[-1],
         cycleAreas[-1],
         cycleEFoldingTimes[-1]
@@ -289,7 +289,17 @@ if __name__ == '__main__':
         for i in range(len(combined_drivers)):
             combined_drivers[i][-2] = list(combined_drivers[i][-2]) + [combined_drivers[i][-2][-1] + 1]
             combined_drivers[i][-1] = list(combined_drivers[i][-1]) + [sc_drivers_for_forecasting[i]]
-        all_drivers_initial = corFoci.get_cross_terms(combined_drivers)  # This includes the testing item as well...
+        all_drivers_initial = corFoci.get_cross_terms(combined_drivers)  # This also includes the initial singletons...
+        # Output this data to a .csv file:
+        nameStr = "FutureMaxAmplitude FutureMaxAmplitudeTime " + " ".join(map(str, [element[0] for element in all_drivers_initial]))
+        all_initial_sc_drivers = np.asarray([element[-1] for element in all_drivers_initial])
+        full_initial_data = np.vstack((maxAmplitudes[1:], maxAmplitudes[1:], all_initial_sc_drivers[:, :-1]))
+        with open('../mgcv/full_data_initial.csv', 'w') as file:
+            file.write(nameStr)
+            file.write('\n')
+            for i in range(len(full_initial_data[1])):
+                line = " ".join(map(str, full_initial_data[:, i])) + "\n"
+                file.write(line)
 
         #---------------------------------------------------------------------------------------------------------------
 
@@ -321,36 +331,51 @@ if __name__ == '__main__':
         #---------------------------------------------------------------------------------------------------------------
 
         # Run FOCI:
-        n_feats_A = [10, 7]
-        n_feast_T = [10, 7]
+        n_feats_A = [10, 5]
+        n_feast_T = [10, 5]
+        foci_override = False
 
         # First Iteration...
-        if os.path.isfile('../results/indices_amplitude.pkl') == False:
-            indices_amplitude = corFoci.foci_main_38(maxAmplitudes[1:], np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T,
+        if os.path.isfile('../results/indices_amplitude.pkl') == False or foci_override == True:
+            indices_amplitude, T_a = corFoci.foci_main_38(maxAmplitudes[1:], np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T,
                                       num_features=n_feats_A[0])
             solarToolbox.savePickle(indices_amplitude, '../results/indices_amplitude.pkl')
+            solarToolbox.savePickle(T_a, '../results/T_a.pkl')
         else:
             indices_amplitude = solarToolbox.loadPickle('../results/indices_amplitude.pkl')
-        if os.path.isfile('../results/indices_time.pkl') == False:
-            indices_time = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T,
+            T_a = solarToolbox.loadPickle('../results/T_a.pkl')
+        if os.path.isfile('../results/indices_time.pkl') == False or foci_override == True:
+            indices_time, T_t = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T,
                                       num_features=n_feast_T[0])
             solarToolbox.savePickle(indices_time, '../results/indices_time.pkl')
+            solarToolbox.savePickle(T_t, '../results/T_t.pkl')
         else:
             indices_time = solarToolbox.loadPickle('../results/indices_time.pkl')
+            T_t = solarToolbox.loadPickle('../results/T_t.pkl')
 
         # Second Iteration (sanity check)...
         scaled_sc_drivers_for_forecasting_amplitude_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_amplitude)[:, :-1].T[:, indices_amplitude]
         scaled_sc_drivers_for_forecasting_time_foci_1 = np.asarray(scaled_sc_drivers_for_forecasting_time)[:, :-1].T[:, indices_time]
-        if os.path.isfile('../results/indices_amplitude_2.pkl') == False:
-            indices_amplitude_2 = corFoci.foci_main_38(maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_1, num_features=n_feats_A[-1])
+        if os.path.isfile('../results/indices_amplitude_2.pkl') == False or foci_override == True:
+            indices_amplitude_2, T_a2 = corFoci.foci_main_38(maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_1, num_features=n_feats_A[-1])
             solarToolbox.savePickle(indices_amplitude_2, '../results/indices_amplitude_2.pkl')
+            solarToolbox.savePickle(T_a, '../results/T_a2.pkl')
         else:
             indices_amplitude_2 = solarToolbox.loadPickle('../results/indices_amplitude_2.pkl')
-        if os.path.isfile('../results/indices_time_2.pkl') == False:
-            indices_time_2 = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_1, num_features=n_feast_T[-1])
+            T_a2 = solarToolbox.loadPickle('../results/T_a2.pkl')
+        if os.path.isfile('../results/indices_time_2.pkl') == False or foci_override == True:
+            indices_time_2, T_t2 = corFoci.foci_main_38(np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_1, num_features=n_feast_T[-1])
             solarToolbox.savePickle(indices_time_2, '../results/indices_time_2.pkl')
+            solarToolbox.savePickle(T_t2, '../results/T_t2.pkl')
         else:
             indices_time_2 = solarToolbox.loadPickle('../results/indices_time_2.pkl')
+            T_t2 = solarToolbox.loadPickle('../results/T_t.pkl')
+
+        # Use the FOCI coefficient to finalize the selection of indices:
+        num_drivers_amplitude = np.argmin(T_a2) + 1
+        num_drivers_time = np.argmin(T_t2) + 1
+        indices_amplitude_final = indices_amplitude_2[:num_drivers_amplitude]
+        indices_time_final = indices_time_2[:num_drivers_time]
 
         # Collect the downselected drivers...
         scaled_sc_drivers_for_forecasting_amplitude_all = []
@@ -360,6 +385,9 @@ if __name__ == '__main__':
         for idx2 in indices_amplitude_2:
             scaled_sc_drivers_for_forecasting_amplitude_all_info.append(scaled_sc_drivers_for_forecasting_amplitude_all[idx2])
         scaled_sc_drivers_for_forecasting_amplitude_foci_2 = scaled_sc_drivers_for_forecasting_amplitude_foci_1[:, indices_amplitude_2]
+        scaled_sc_drivers_for_forecasting_amplitude_foci_FINAL = scaled_sc_drivers_for_forecasting_amplitude_foci_2[:,
+                                                            indices_amplitude_final]
+
         scaled_sc_drivers_for_forecasting_time_all = []
         scaled_sc_drivers_for_forecasting_time_all_info = []
         for idx in indices_time:
@@ -367,13 +395,14 @@ if __name__ == '__main__':
         for idx2 in indices_time_2:
             scaled_sc_drivers_for_forecasting_time_all_info.append(scaled_sc_drivers_for_forecasting_time_all[idx2])
         scaled_sc_drivers_for_forecasting_time_foci_2 = scaled_sc_drivers_for_forecasting_time_foci_1[:, indices_time_2]
+        scaled_sc_drivers_for_forecasting_time_foci_FINAL = scaled_sc_drivers_for_forecasting_time_foci_2[:, indices_time_final]
 
         #---------------------------------------------------------------------------------------------------------------
 
         # Output the FOCI results to a .CSV file for use by MGCV...
         # Amplitude...
-        nameStr = "FutureMaxAmplitude "+" ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_amplitude_all_info]))
-        full_data_amplitude = np.vstack((maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_2.T))
+        nameStr = "FutureMaxAmplitude "+" ".join(map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_amplitude_all_info[:len(indices_amplitude_final)]]))
+        full_data_amplitude = np.vstack((maxAmplitudes[1:], scaled_sc_drivers_for_forecasting_amplitude_foci_FINAL.T))
         with open('../mgcv/full_data_amplitude.csv', 'w') as file:
             file.write(nameStr)
             file.write('\n')
@@ -382,8 +411,8 @@ if __name__ == '__main__':
                 file.write(line)
         # Time...
         nameStr = "FutureMaxAmplitudeTime " + " ".join(
-            map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_time_all_info]))
-        full_data_amplitude_time = np.vstack((np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_2.T))
+            map(str, [element[0] for element in scaled_sc_drivers_for_forecasting_time_all_info[:len(indices_time_final)]]))
+        full_data_amplitude_time = np.vstack((np.asarray(cycleAscendingTimes[1:]), scaled_sc_drivers_for_forecasting_time_foci_FINAL.T))
         with open('../mgcv/full_data_amplitude_time.csv', 'w') as file:
             file.write(nameStr)
             file.write('\n')
@@ -535,7 +564,7 @@ if __name__ == '__main__':
     # TODO: Validation: Running this method for PAST cycles:
 
     # Load in the PyGAM 'best SC max time' results ANYWAY and plot them if desired (they must exist first):
-    use_pygam_time_estimate = True
+    use_pygam_time_estimate = False
     if use_pygam_time_estimate:
         amplitude_time_cache_file = '../results/amplitude_time_cache.pkl'
         if os.path.isfile(amplitude_time_cache_file) == True:

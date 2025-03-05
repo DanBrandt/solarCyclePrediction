@@ -12,12 +12,7 @@ df_amplitude = data.frame(GAM_data_amplitude)
 
 # (1a): GAM Regression w/ Summary
 bpA = gam(FutureMaxAmplitude ~s(CycleEFoldingTime) +
-            s(AscentTime_DescentTime_AscentDescentRatio) +
-            s(AscentTime_DescentTime) +
-            s(AscentTime_CycleLength_DescentRate_AscentDescentRatio_CycleArea) +
-            s(AscentTime_DescentTime_AscentDescentRatio_CycleEFoldingTime) +
-            s(AscentTime_DescentTime_CycleLength_AscentDescentRatio_CycleEFoldingTime) +
-            s(AscentTime_CycleArea), data=df_amplitude)
+            s(MinAmplitude), data=df_amplitude)
 summary(bpA)
 
 # (1b): SC24 Hindcast (save results)
