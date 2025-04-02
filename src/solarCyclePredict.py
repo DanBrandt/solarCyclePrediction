@@ -42,8 +42,8 @@ if __name__ == '__main__':
     # Find the peaks and terminators of each cycle, by looking at each one individually:
     cyclePeaks, _ = find_peaks(smoothedSpots, distance=85, prominence=5)
     cycleTroughs, _ = find_peaks(-smoothedSpots, distance=85)
-    # Clip the data so that the very first cycle is ignored, and Solar Cycle 25 is not considered:
     bounds = [smoothedTimes[cycleTroughs[0]]], smoothedTimes[cycleTroughs[-1]]
+    # Clip the data so that the very first cycle is ignored, and Solar Cycle 25 is not considered:
     clippedDailyTimes, inds = solarToolbox.clip(dailyTimes, bounds)
     clippedDailySpots = dailySpots[inds]
     clippedModifiedDailySpots = np.where(clippedDailySpots == -1, np.nan, clippedDailySpots)
@@ -56,6 +56,8 @@ if __name__ == '__main__':
     peaksTimes = np.asarray(monthlyTimes)[clippedCyclePeaks]
     monthlyPeaksVals = np.asarray(monthlySpots)[clippedCyclePeaks]
     smoothedPeaksVals = np.asarray(smoothedSpots)[clippedCyclePeaks]
+
+
     # Length of each solar cycle:
     cycleLengths = []
     for i in range(len(cycleTroughs) - 1):
@@ -93,6 +95,7 @@ if __name__ == '__main__':
         yVals = monthlySpots[cycleTroughs[i]:cycleTroughs[i + 1]]
         cycleAreas.append(trapezoid(yVals))
     cycleAreas = np.asarray(cycleAreas)
+
     # Extract each solar cycle for the purpose of Superposed Epoch Analysis (and Dynamic Time Warping):
     boundaries = [solarToolbox.find_nearest(np.asarray(clippedMonthlyTimes), element)[0] for element in
                   np.asarray(smoothedTimes)[cycleTroughs]]
@@ -109,6 +112,7 @@ if __name__ == '__main__':
     axs[1].set_ylabel('13-Month Smoothed $S_{\mathrm{N}}$')
     fig.suptitle('Overlaid Solar Cycles', fontsize=18)
     plt.savefig(figures_directory + 'overlaidSolarCycles.png', dpi=300)
+
     # Perform standard Superposed Epoch Analysis, using the mean cycle duration as the normalized epoch timeline:
     normalizedSuperposedMonthlySSN = solarToolbox.SEA(superposedMonthlySSN)
     meanNSM_SSN = np.mean(normalizedSuperposedMonthlySSN, axis=0)
@@ -125,6 +129,7 @@ if __name__ == '__main__':
     axs[1].set_ylabel('13-Month Smoothed SSN')
     fig.suptitle('Superposed Solar Cycles (Method 1)', fontsize=18)
     plt.savefig(figures_directory + 'superposedSolarCycles.png', dpi=300)
+
     # Perform CUSTOM Superposed Epoch Analysis, using the mean peak location, mean e-folding time, AND mean cycle duration to construct the normalized epoch timeline (analagous to Katus, et al. 2015: https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2012JA017915):
     # customNormedSuperMonthlySNN = solarToolbox.customSEA(superposedMonthlySSN)
     # meanCustomNSM_SSN = np.mean(customNormedSuperMonthlySNN, axis=0)
@@ -141,6 +146,7 @@ if __name__ == '__main__':
     # axs[1].set_ylabel('13-Month Smoothed SSN')
     # fig.suptitle('Superposed Solar Cycles (Method 2)', fontsize=18)
     # plt.savefig(figures_directory + 'superposedSolarCyclesMethod2.png', dpi=300)
+
     # E-folding times:
     cycleEFoldingTimes = np.array(
         [solarToolbox.eFold(element)[0] for element in superposedSmoothedSSN]) / 12.  # In units of years (formerly did this with superposedMonthlySSN)
@@ -291,16 +297,28 @@ if __name__ == '__main__':
             combined_drivers[i][-1] = list(combined_drivers[i][-1]) + [sc_drivers_for_forecasting[i]]
         all_drivers_initial = corFoci.get_cross_terms(combined_drivers)  # This also includes the initial singletons...
         # Output this data to a .csv file:
-        nameStr = "FutureMaxAmplitude FutureMaxAmplitudeTime " + " ".join(map(str, [element[0] for element in all_drivers_initial]))
+        nameStr = "FutureMaxAmplitude FutureMaxAmplitudeTime" + " ".join(map(str, [element[0] for element in all_drivers_initial]))
         all_initial_sc_drivers = np.asarray([element[-1] for element in all_drivers_initial])
-        full_initial_data = np.vstack((maxAmplitudes[1:], maxAmplitudes[1:], all_initial_sc_drivers[:, :-1]))
+        full_initial_data = np.vstack((maxAmplitudes[1:], np.asarray(cycleAscendingTimes[1:]), all_initial_sc_drivers[:, :-1]))
+        # CSV
         with open('../mgcv/full_data_initial.csv', 'w') as file:
-            file.write(nameStr)
-            file.write('\n')
+            wr = csv.writer(file, delimiter=" ")
+            wr.writerow(nameStr) # file.write(nameStr)
+            wr.writerow('\n') # file.write('\n')
             for i in range(len(full_initial_data[1])):
                 line = " ".join(map(str, full_initial_data[:, i])) + "\n"
-                file.write(line)
-
+                wr.writerow(line) # file.write(line)
+        # Excel
+        import openpyxl as xl
+        wb = xl.Workbook()
+        ws = wb.active
+        nameList = ["FutureMaxAmplitude", "FutureMaxAmplitudeTime", *[element[0] for element in all_drivers_initial]]
+        ws.append(nameList)
+        for i in range(len(full_initial_data[1])):
+            lineList = full_initial_data[:, i].tolist()
+            ws.append(lineList)
+        wb.save('../mgcv/full_data_initial.xlsx')
+        wb.close()
         #---------------------------------------------------------------------------------------------------------------
 
         # Scale all the input data using an affine transformation

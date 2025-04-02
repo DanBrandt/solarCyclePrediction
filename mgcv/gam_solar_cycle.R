@@ -48,13 +48,7 @@ df_amplitude_time = data.frame(GAM_data_amplitude_time)
 
 # (2a): GAM Regression w/ Summary
 # gam.control(maxit=500)
-bpT = gam(FutureMaxAmplitudeTime ~  s(MinAmplitude_AscentTime_DescentRate_CycleEFoldingTime) + 
-            s(AscentTime_DescentTime_CycleLength) + 
-            s(MinAmplitude_DescentRate) +
-            s(MaxAmplitude_AscentTime_DescentTime_DescentRate) +
-            s(MinAmplitude_AscentTime_DescentRate) +
-            s(CycleLength) +
-            s(MinAmplitude_AscentTime_AscentRate_DescentRate_CycleEFoldingTime), data=df_amplitude_time) #, optimizer="efs")
+bpT = gam(FutureMaxAmplitudeTime ~  s(CycleLength), data=df_amplitude_time) #, optimizer="efs")
 summary(bpT)
 
 # (2b): SC24 Hindcast (save results)
